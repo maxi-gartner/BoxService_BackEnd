@@ -1,14 +1,14 @@
 using System;
 using System.Net;
-//using BoxService_BackEnd.Controllers;
+using BoxService_BackEnd.Controllers;
 
 namespace BoxService_BackEnd
 {
     public class Router
     {
-        //private readonly HealthController       _health;
-        //private readonly PresupuestosController _presupuestos;
-        //private readonly FacturasController     _facturas;
+        private readonly HealthController       _health;
+        private readonly PresupuestosController _presupuestos;
+        private readonly FacturasController     _facturas;
 
         // Descomentar cuando cada integrante conecte su controller
         // private readonly ClientesController    _clientes;
@@ -17,9 +17,9 @@ namespace BoxService_BackEnd
 
         public Router()
         {
-        //    _health       = new HealthController();
-         //   _presupuestos = new PresupuestosController();
-         //   _facturas     = new FacturasController();
+            _health       = new HealthController();
+            _presupuestos = new PresupuestosController();
+            _facturas     = new FacturasController();
         }
 
         public void Route(HttpListenerRequest request, HttpListenerResponse response)
@@ -32,22 +32,22 @@ namespace BoxService_BackEnd
                 // ── Health ──────────────────────────────────────────────
                 if (method == "GET" && path == "/health")
                 {
-                 //   _health.GetHealth(response);
+                    _health.GetHealth(response);
                     return;
                 }
 
                 // ── Presupuestos ────────────────────────────────────────
-              // if (method == "GET"  && path == "/api/presupuestos")                      { _presupuestos.GetAll(response);              return; }
-              // if (method == "GET"  && path.StartsWith("/api/presupuestos/"))             { _presupuestos.GetById(request, response);    return; }
-              // if (method == "POST" && path == "/api/presupuestos")                      { _presupuestos.Create(request, response);     return; }
-              // if (method == "PUT"  && path.Contains("/estado"))                         { _presupuestos.CambiarEstado(request, response); return; }
-              // if (method == "POST" && path.Contains("/aprobar"))                        { _presupuestos.Aprobar(request, response);    return; }
+                if (method == "GET"  && path == "/api/presupuestos")                      { _presupuestos.GetAll(response);              return; }
+                if (method == "GET"  && path.StartsWith("/api/presupuestos/"))             { _presupuestos.GetById(request, response);    return; }
+                if (method == "POST" && path == "/api/presupuestos")                      { _presupuestos.Create(request, response);     return; }
+                if (method == "PUT"  && path.Contains("/estado"))                         { _presupuestos.CambiarEstado(request, response); return; }
+                if (method == "POST" && path.Contains("/aprobar"))                        { _presupuestos.Aprobar(request, response);    return; }
 
                 // ── Facturas ────────────────────────────────────────────
-              // if (method == "GET"  && path == "/api/facturas")                          { _facturas.GetAll(response);                  return; }
-              // if (method == "GET"  && path.StartsWith("/api/facturas/"))                { _facturas.GetById(request, response);        return; }
-              // if (method == "POST" && path == "/api/facturas")                          { _facturas.Create(request, response);         return; }
-              // if (method == "PUT"  && path.StartsWith("/api/facturas/"))                { _facturas.CambiarEstado(request, response);  return; }
+                if (method == "GET"  && path == "/api/facturas")                          { _facturas.GetAll(response);                  return; }
+                if (method == "GET"  && path.StartsWith("/api/facturas/"))                { _facturas.GetById(request, response);        return; }
+                if (method == "POST" && path == "/api/facturas")                          { _facturas.Create(request, response);         return; }
+                if (method == "PUT"  && path.StartsWith("/api/facturas/"))                { _facturas.CambiarEstado(request, response);  return; }
 
                 // ── Clientes (Cristhian — descomentar al conectar) ──────
                 // if (method == "GET"  && path == "/api/clientes")                       { _clientes.GetAll(response);            return; }
