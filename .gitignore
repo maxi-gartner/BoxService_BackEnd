@@ -1,5 +1,75 @@
-﻿.vs/
+﻿# =========================
+# Visual Studio / IDE
+# =========================
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# =========================
+# Build / Output
+# =========================
 bin/
 obj/
+out/
+publish/
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Environment / Config
+# =========================
 .env
+.env.*
 appsettings.Development.json
+appsettings.Local.json
+
+# ⚠️ NO ignores esto si es config base
+# appsettings.json
+
+# =========================
+# Secrets / Keys
+# =========================
+*.pfx
+*.key
+*.pem
+secrets.json
+
+# =========================
+# Database / Local files
+# =========================
+*.db
+*.sqlite
+*.bak
+
+# ⚠️ IMPORTANTE:
+# Si vas a versionar scripts SQL → comentá esto
+# *.sql
+
+# =========================
+# Test / Coverage
+# =========================
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Misc
+# =========================
+*.tmp
+*.temp
+*.cache
