@@ -38,7 +38,7 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 
 | Nombre | Legajo | Módulo |
 |---|---|---|
-| Gartner, Maximiliano | 18396 | Arquitecto + Presupuestos y Facturas |
+| Gartner, Maximiliano | 18396 | Arquitectura + Presupuestos y Facturas |
 | Carrasco, Cristhian | 18403 | Clientes |
 | Busch, Leonardo | 18404 | Vehículos |
 | Quesada, Oscar | 18382 | Services + Dashboard |
