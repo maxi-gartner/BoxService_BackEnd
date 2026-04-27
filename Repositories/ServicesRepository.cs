@@ -30,7 +30,7 @@ namespace BoxService_BackEnd.Repositories
 
             // Abrimos conexión a la base
             using var connection = DatabaseConnection.GetConnection();
-            connection.Open();
+            //connection.Open();
 
             // Consulta SQL
             var sql = @"
@@ -44,7 +44,7 @@ namespace BoxService_BackEnd.Repositories
                     proxima_fecha,
                     id_vehiculo,
                     id_presupuesto
-                FROM services
+                FROM service
                 ORDER BY fecha DESC;
             ";
 
@@ -68,7 +68,7 @@ namespace BoxService_BackEnd.Repositories
         public Service? GetById(int id)
         {
             using var connection = DatabaseConnection.GetConnection();
-            connection.Open();
+            //connection.Open();
 
             var sql = @"
                 SELECT 
@@ -81,7 +81,7 @@ namespace BoxService_BackEnd.Repositories
                     proxima_fecha,
                     id_vehiculo,
                     id_presupuesto
-                FROM services
+                FROM service
                 WHERE id_service = @id_service;
             ";
 
@@ -108,10 +108,10 @@ namespace BoxService_BackEnd.Repositories
         public Service Create(Service service)
         {
             using var connection = DatabaseConnection.GetConnection();
-            connection.Open();
+            //connection.Open();
 
             var sql = @"
-                INSERT INTO services
+                INSERT INTO service
                 (
                     fecha,
                     kilometraje,
