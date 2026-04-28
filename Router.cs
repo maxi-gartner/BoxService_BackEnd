@@ -13,13 +13,14 @@ namespace BoxService_BackEnd
         // Descomentar cuando cada integrante conecte su controller
         // private readonly ClientesController    _clientes;
         // private readonly VehiculosController   _vehiculos;
-        // private readonly ServicesController    _services;
+         private readonly ServicesController    _services; // Descomentado por Oscar
 
         public Router()
         {
             _health       = new HealthController();
             _presupuestos = new PresupuestosController();
             _facturas     = new FacturasController();
+            _services = new ServicesController(); // Agregado por Oscar
         }
 
         public void Route(HttpListenerRequest request, HttpListenerResponse response)
@@ -60,9 +61,9 @@ namespace BoxService_BackEnd
                 // if (method == "POST" && path == "/api/vehiculos")                      { _vehiculos.Create(request, response);   return; }
 
                 // ── Services (Oscar — descomentar al conectar) ──────────
-                // if (method == "GET"  && path == "/api/services")                       { _services.GetAll(response);            return; }
-                // if (method == "GET"  && path.StartsWith("/api/services/"))             { _services.GetById(request, response);  return; }
-                // if (method == "POST" && path == "/api/services")                       { _services.Create(request, response);   return; }
+                if (method == "GET"  && path == "/api/services")                       { _services.GetAll(response);            return; } // Descomentado por Oscar
+                if (method == "GET"  && path.StartsWith("/api/services/"))             { _services.GetById(request, response);  return; } // Descomentado por Oscar
+                if (method == "POST" && path == "/api/services")                       { _services.Create(request, response);   return; } // Descomentado por Oscar
 
                 // ── 404 ─────────────────────────────────────────────────
                 ResponseHelper.Send(response, 404, new
