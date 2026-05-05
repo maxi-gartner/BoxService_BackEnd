@@ -4,63 +4,53 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-public static class ResponseHelper
+namespace BoxService_BackEnd
 {
-    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+    public static class ResponseHelper
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    };
-
-    public static void WriteResponse(HttpListenerResponse response, int statusCode, object data)
-    {
-        response.StatusCode = statusCode;
-        response.ContentType = "application/json; charset=utf-8";
-
-        var envelope = new
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
-            success = true,
-            data,
-            error = (object?)null
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
         };
 
-        var json = JsonSerializer.Serialize(envelope, JsonOptions);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        response.ContentLength64 = bytes.Length;
-        response.OutputStream.Write(bytes, 0, bytes.Length);
-    }
-
-    public static void WriteError(HttpListenerResponse response, int statusCode, string message)
-    {
-        response.StatusCode = statusCode;
-        response.ContentType = "application/json; charset=utf-8";
-
-        var envelope = new
+        private static void Send(HttpListenerResponse response, int statusCode, object body)
         {
-            success = false,
-            data = (object?)null,
-            error = new
-            {
-                code = statusCode,
-                message
-            }
-        };
+            var json  = JsonSerializer.Serialize(body, JsonOptions);
+            var bytes = Encoding.UTF8.GetBytes(json);
 
-        var json = JsonSerializer.Serialize(envelope, JsonOptions);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        response.ContentLength64 = bytes.Length;
-        response.OutputStream.Write(bytes, 0, bytes.Length);
-    }
+            response.StatusCode      = statusCode;
+            response.ContentType     = "application/json; charset=utf-8";
+            response.ContentLength64 = bytes.Length;
 
-    public static async Task<T?> ReadJsonBodyAsync<T>(HttpListenerRequest request)
-    {
-        using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8);
-        var body = await reader.ReadToEndAsync();
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return default;
+            response.OutputStream.Write(bytes, 0, bytes.Length);
+            response.OutputStream.Close();
         }
 
-        return JsonSerializer.Deserialize<T>(body, JsonOptions);
+        public static void Ok(HttpListenerResponse response, object data)
+            => Send(response, 200, new { success = true, data, error = (object?)null });
+
+        public static void Created(HttpListenerResponse response, object data)
+            => Send(response, 201, new { success = true, data, error = (object?)null });
+
+        public static void BadRequest(HttpListenerResponse response, string message)
+            => Send(response, 400, new { success = false, data = (object?)null, error = new { code = 400, message } });
+
+        public static void NotFound(HttpListenerResponse response, string message)
+            => Send(response, 404, new { success = false, data = (object?)null, error = new { code = 404, message } });
+
+        public static void InternalError(HttpListenerResponse response, string message = "Error interno del servidor")
+            => Send(response, 500, new { success = false, data = (object?)null, error = new { code = 500, message } });
+
+        public static async Task<T?> ReadJsonBodyAsync<T>(HttpListenerRequest request)
+        {
+            using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8);
+            var body = await reader.ReadToEndAsync();
+
+            if (string.IsNullOrWhiteSpace(body))
+                return default;
+
+            return JsonSerializer.Deserialize<T>(body, JsonOptions);
+        }
     }
 }

@@ -1,137 +1,145 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using BoxService_BackEnd.Controllers;
 
-public class Router
+namespace BoxService_BackEnd
 {
-    private readonly VehicleController _vehicleController;
-
-    public Router(VehicleController vehicleController)
+    public class Router
     {
-        _vehicleController = vehicleController;
-    }
+        private readonly HealthController _health;
+        private readonly PresupuestosController _presupuestos;
+        private readonly FacturasController _facturas;
+        private readonly VehicleController _vehiculos;
+        private readonly ServicesController _services;
 
-    public async Task RouteAsync(HttpListenerContext context)
-    {
-        var request = context.Request;
-        var path = request.Url?.AbsolutePath ?? "/";
-        var method = request.HttpMethod;
-
-        if (method == "GET" && path == "/")
+        public Router()
         {
-            ResponseHelper.WriteResponse(context.Response, 200, new { message = "BoxService Backend", status = "online", version = "1.0.0" });
-            return;
+            _health       = new HealthController();
+            _presupuestos = new PresupuestosController();
+            _facturas     = new FacturasController();
+            _vehiculos    = new VehicleController();
+            _services     = new ServicesController();
         }
 
-        if (method == "GET" && path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+        public async Task RouteAsync(HttpListenerContext context)
         {
-            await HandleHealthAsync(context);
-            return;
-        }
+            var request  = context.Request;
+            var response = context.Response;
 
-        if (path.StartsWith("/vehiculos", StringComparison.OrdinalIgnoreCase))
-        {
-            if (method == "GET" && path.Equals("/vehiculos", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.GetAllAsync(context);
-                return;
-            }
+            var method = request.HttpMethod.ToUpper();
+            var path   = request.Url?.AbsolutePath.TrimEnd('/') ?? "/";
 
-            if (method == "GET" && path.Equals("/vehiculos/buscar", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                await _vehicleController.SearchByPlateAsync(context);
-                return;
-            }
-
-            if (method == "GET" && path.EndsWith("/historial", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.GetVehicleHistoryAsync(context);
-                return;
-            }
-
-            if (TryGetIdFromPath(path, "/vehiculos/", out var id))
-            {
-                if (method == "GET")
+                // ── ROOT ──────────────────────────────────────────────
+                if (method == "GET" && path == "/")
                 {
-                    await _vehicleController.GetByIdAsync(context, id);
+                    ResponseHelper.Ok(response, new
+                    {
+                        message = "BoxService Backend",
+                        status  = "online",
+                        version = "1.0.0"
+                    });
                     return;
                 }
-            }
 
-            if (method == "POST" && path.Equals("/vehiculos", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.CreateAsync(context);
-                return;
-            }
-        }
-
-        if (path.StartsWith("/api/vehiculos", StringComparison.OrdinalIgnoreCase))
-        {
-            if (method == "GET" && path.Equals("/api/vehiculos", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.GetAllAsync(context);
-                return;
-            }
-
-            if (method == "GET" && path.Equals("/api/vehiculos/buscar", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.SearchByPlateAsync(context);
-                return;
-            }
-
-            if (method == "GET" && path.EndsWith("/historial", StringComparison.OrdinalIgnoreCase))
-            {
-                await _vehicleController.GetVehicleHistoryAsync(context);
-                return;
-            }
-
-            if (TryGetIdFromPath(path, "/api/vehiculos/", out var id))
-            {
-                if (method == "GET")
+                // ── HEALTH ────────────────────────────────────────────
+                if (method == "GET" && path == "/health")
                 {
-                    await _vehicleController.GetByIdAsync(context, id);
+                    _health.GetHealth(response);
                     return;
                 }
-            }
 
-            if (method == "POST" && path.Equals("/api/vehiculos", StringComparison.OrdinalIgnoreCase))
+                // ── VEHICULOS ─────────────────────────────────────────
+                if (path.StartsWith("/api/vehiculos"))
+                {
+                    if (method == "GET" && path == "/api/vehiculos")
+                        await _vehiculos.GetAllAsync(context);
+
+                    else if (method == "GET" && path.Contains("/buscar"))
+                        await _vehiculos.SearchByPlateAsync(context);
+
+                    else if (method == "GET" && path.EndsWith("/historial"))
+                        await _vehiculos.GetVehicleHistoryAsync(context);
+
+                    else if (method == "POST" && path == "/api/vehiculos")
+                        await _vehiculos.CreateAsync(context);
+
+                    else if (TryGetId(path, "/api/vehiculos/", out int id))
+                        await _vehiculos.GetByIdAsync(context, id);
+
+                    else
+                        ResponseHelper.NotFound(response, "Ruta de vehículos no válida");
+
+                    return;
+                }
+
+                // ── PRESUPUESTOS ──────────────────────────────────────
+                if (path.StartsWith("/api/presupuestos"))
+                {
+                    if (method == "GET" && path == "/api/presupuestos")
+                        _presupuestos.GetAll(response);
+
+                    else if (method == "POST")
+                        _presupuestos.Create(request, response);
+
+                    else
+                        _presupuestos.GetById(request, response);
+
+                    return;
+                }
+
+                // ── FACTURAS ──────────────────────────────────────────
+                if (path.StartsWith("/api/facturas"))
+                {
+                    if (method == "GET" && path == "/api/facturas")
+                        _facturas.GetAll(response);
+
+                    else if (method == "POST")
+                        _facturas.Create(request, response);
+
+                    else
+                        _facturas.GetById(request, response);
+
+                    return;
+                }
+
+                // ── SERVICES ──────────────────────────────────────────
+                if (path.StartsWith("/api/services"))
+                {
+                    if (method == "GET" && path == "/api/services")
+                        _services.GetAll(response);
+
+                    else if (method == "POST")
+                        _services.Create(request, response);
+
+                    else
+                        _services.GetById(request, response);
+
+                    return;
+                }
+
+                // ── 404 ───────────────────────────────────────────────
+                ResponseHelper.NotFound(response, $"Ruta no encontrada: {method} {path}");
+            }
+            catch (Exception ex)
             {
-                await _vehicleController.CreateAsync(context);
-                return;
+                Console.WriteLine($"[ERROR] {ex.Message}");
+                ResponseHelper.InternalError(response);
             }
         }
 
-        ResponseHelper.WriteError(context.Response, 404, "Ruta no encontrada");
-    }
-
-    private static bool TryGetIdFromPath(string path, string prefix, out int id)
-    {
-        id = 0;
-        if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        private bool TryGetId(string path, string prefix, out int id)
         {
-            return false;
+            id = 0;
+
+            if (!path.StartsWith(prefix))
+                return false;
+
+            var segment = path.Substring(prefix.Length).Trim('/');
+
+            return int.TryParse(segment, out id);
         }
-
-        var segment = path[prefix.Length..].Trim('/');
-        if (segment.Contains("/"))
-        {
-            return false;
-        }
-
-        return int.TryParse(segment, out id);
-    }
-
-    private static Task HandleHealthAsync(HttpListenerContext context)
-    {
-        var health = new
-        {
-            status = "healthy",
-            database = "connected",
-            timestamp = DateTime.UtcNow.ToString("o"),
-            version = "1.0.0"
-        };
-
-        ResponseHelper.WriteResponse(context.Response, 200, health);
-        return Task.CompletedTask;
     }
 }
