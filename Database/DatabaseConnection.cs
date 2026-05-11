@@ -3,20 +3,18 @@ using Npgsql;
 
 namespace BoxService_BackEnd.Database
 {
-    public class DatabaseConnection
+    public static class DatabaseConnection
     {
-        private const string Host     = "localhost";
-        private const string Port     = "5432";
-        private const string Database = "boxservice";
-        private const string Username = "postgres";
-        private const string Password = "postgres";
+        private static string _connectionString = "";
 
-        private static readonly string ConnectionString =
-            $"Host={Host};Port={Port};Database={Database};Username={Username};Password={Password}";
+        public static void Configure(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
 
         public static NpgsqlConnection GetConnection()
         {
-            var connection = new NpgsqlConnection(ConnectionString);
+            var connection = new NpgsqlConnection(_connectionString);
             connection.Open();
             return connection;
         }

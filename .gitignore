@@ -29,9 +29,7 @@ logs/
 .env.*
 appsettings.Development.json
 appsettings.Local.json
-
-# ⚠️ NO ignores esto si es config base
-# appsettings.json
+appsettings.json
 
 # =========================
 # Secrets / Keys

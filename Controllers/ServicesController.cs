@@ -19,28 +19,17 @@ namespace BoxService_BackEnd.Controllers
         public void GetAll(HttpListenerResponse response)
         {
             var services = _servicesService.GetAll();
-
-            ResponseHelper.Send(response, 200, new
-            {
-                success = true,
-                data = services,
-                error = (object?)null
-            });
+            ResponseHelper.Ok(response, services);
         }
 
         public void GetById(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var path  = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
             var parts = path.Split('/');
 
             if (parts.Length < 4 || !int.TryParse(parts[3], out int id))
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "ID de service inválido" }
-                });
+                ResponseHelper.BadRequest(response, "ID de service inválido");
                 return;
             }
 
@@ -48,21 +37,11 @@ namespace BoxService_BackEnd.Controllers
 
             if (service == null)
             {
-                ResponseHelper.Send(response, 404, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 404, message = "Service no encontrado" }
-                });
+                ResponseHelper.NotFound(response, "Service no encontrado");
                 return;
             }
 
-            ResponseHelper.Send(response, 200, new
-            {
-                success = true,
-                data = service,
-                error = (object?)null
-            });
+            ResponseHelper.Ok(response, service);
         }
 
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
@@ -81,34 +60,18 @@ namespace BoxService_BackEnd.Controllers
             }
             catch
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "JSON inválido" }
-                });
+                ResponseHelper.BadRequest(response, "JSON inválido");
                 return;
             }
 
             if (service == null)
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "Datos del service inválidos" }
-                });
+                ResponseHelper.BadRequest(response, "Datos del service inválidos");
                 return;
             }
 
             var creado = _servicesService.Create(service);
-
-            ResponseHelper.Send(response, 201, new
-            {
-                success = true,
-                data = creado,
-                error = (object?)null
-            });
+            ResponseHelper.Created(response, creado);
         }
     }
 }
