@@ -1,19 +1,28 @@
+using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace BoxService_BackEnd
 {
     public static class ResponseHelper
     {
-        public static void Send(HttpListenerResponse response, int statusCode, object body)
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
-            var json  = JsonSerializer.Serialize(body);
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+
+        private static void Send(HttpListenerResponse response, int statusCode, object body)
+        {
+            var json  = JsonSerializer.Serialize(body, JsonOptions);
             var bytes = Encoding.UTF8.GetBytes(json);
 
             response.StatusCode      = statusCode;
             response.ContentType     = "application/json; charset=utf-8";
             response.ContentLength64 = bytes.Length;
+
             response.OutputStream.Write(bytes, 0, bytes.Length);
             response.OutputStream.Close();
         }
@@ -32,5 +41,16 @@ namespace BoxService_BackEnd
 
         public static void InternalError(HttpListenerResponse response, string message = "Error interno del servidor")
             => Send(response, 500, new { success = false, data = (object?)null, error = new { code = 500, message } });
+
+        public static async Task<T?> ReadJsonBodyAsync<T>(HttpListenerRequest request)
+        {
+            using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8);
+            var body = await reader.ReadToEndAsync();
+
+            if (string.IsNullOrWhiteSpace(body))
+                return default;
+
+            return JsonSerializer.Deserialize<T>(body, JsonOptions);
+        }
     }
 }

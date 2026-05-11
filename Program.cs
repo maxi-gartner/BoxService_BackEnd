@@ -1,4 +1,7 @@
-using BoxService_BackEnd;
+﻿using System;
 
-var server = new Server();
-server.Start();
+var connectionString = Environment.GetEnvironmentVariable("BOXSERVICE_CONNECTION_STRING")
+    ?? "Host=localhost;Port=5432;Username=postgres;Password=admin;Database=boxservice";
+
+var server = new Server(connectionString);
+await server.StartAsync();
