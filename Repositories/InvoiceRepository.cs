@@ -6,11 +6,11 @@ using Npgsql;
 
 namespace BoxService_BackEnd.Repositories
 {
-    public class FacturasRepository
+    public class InvoiceRepository
     {
-        public List<Factura> GetAll()
+        public List<Invoice> GetAll()
         {
-            var lista = new List<Factura>();
+            var lista = new List<Invoice>();
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM facturas ORDER BY created_at DESC", conn);
             using var reader = cmd.ExecuteReader();
@@ -18,7 +18,7 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public Factura? GetById(int id)
+        public Invoice? GetById(int id)
         {
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM facturas WHERE id_factura = @id", conn);
@@ -27,47 +27,52 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
-        public bool ExisteFacturaParaService(int idService)
+        public bool InvoiceExistsForService(int serviceId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("SELECT COUNT(*) FROM facturas WHERE id_service = @id", conn);
-            cmd.Parameters.AddWithValue("id", idService);
+            cmd.Parameters.AddWithValue("id", serviceId);
             return (long)cmd.ExecuteScalar()! > 0;
         }
 
-        public string GetUltimoNumero()
+        public string GetLastNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("SELECT numero FROM facturas ORDER BY id_factura DESC LIMIT 1", conn);
             return cmd.ExecuteScalar()?.ToString() ?? "F-0000";
         }
 
-        public int CrearConTransaccion(Factura f)
+        /// <summary>
+        /// Transacción ACID — emitir factura:
+        /// 1. Inserta la factura
+        /// 2. Actualiza el service
+        /// </summary>
+        public int CreateWithTransaction(Invoice inv)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var tx   = conn.BeginTransaction();
             try
             {
                 // PASO 1 — insertar factura
-                using var cmdFactura = new NpgsqlCommand(@"
+                using var cmdInvoice = new NpgsqlCommand(@"
                     INSERT INTO facturas (numero, fecha, total, estado, id_service, id_presupuesto)
-                    VALUES (@numero, @fecha, @total, 'emitida', @id_service, @id_presupuesto)
+                    VALUES (@numero, @fecha, @total, 'issued', @id_service, @id_presupuesto)
                     RETURNING id_factura", conn, tx);
-                cmdFactura.Parameters.AddWithValue("numero",         f.Numero);
-                cmdFactura.Parameters.AddWithValue("fecha",          DateTime.Today);
-                cmdFactura.Parameters.AddWithValue("total",          f.Total);
-                cmdFactura.Parameters.AddWithValue("id_service",     f.IdService);
-                cmdFactura.Parameters.AddWithValue("id_presupuesto", (object?)f.IdPresupuesto ?? DBNull.Value);
-                var idFactura = (int)cmdFactura.ExecuteScalar()!;
+                cmdInvoice.Parameters.AddWithValue("numero",         inv.Number);
+                cmdInvoice.Parameters.AddWithValue("fecha",          DateTime.Today);
+                cmdInvoice.Parameters.AddWithValue("total",          inv.Total);
+                cmdInvoice.Parameters.AddWithValue("id_service",     inv.ServiceId);
+                cmdInvoice.Parameters.AddWithValue("id_presupuesto", (object?)inv.BudgetId ?? DBNull.Value);
+                var invoiceId = (int)cmdInvoice.ExecuteScalar()!;
 
-                // PASO 2 — marcar service como facturado
+                // PASO 2 — marcar service
                 using var cmdService = new NpgsqlCommand(
                     "UPDATE services SET tipo_service = tipo_service WHERE id_service = @id", conn, tx);
-                cmdService.Parameters.AddWithValue("id", f.IdService);
+                cmdService.Parameters.AddWithValue("id", inv.ServiceId);
                 cmdService.ExecuteNonQuery();
 
                 tx.Commit();
-                return idFactura;
+                return invoiceId;
             }
             catch
             {
@@ -76,24 +81,24 @@ namespace BoxService_BackEnd.Repositories
             }
         }
 
-        public void CambiarEstado(int id, string estado)
+        public void UpdateStatus(int id, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("UPDATE facturas SET estado = @estado WHERE id_factura = @id", conn);
-            cmd.Parameters.AddWithValue("estado", estado);
+            cmd.Parameters.AddWithValue("estado", status);
             cmd.Parameters.AddWithValue("id",     id);
             cmd.ExecuteNonQuery();
         }
 
-        private static Factura MapRow(NpgsqlDataReader r) => new()
+        private static Invoice MapRow(NpgsqlDataReader r) => new()
         {
-            IdFactura     = (int)r["id_factura"],
-            Numero        = r["numero"].ToString()!,
-            Fecha         = r["fecha"].ToString()!,
-            Total         = (decimal)r["total"],
-            Estado        = r["estado"].ToString()!,
-            IdService     = (int)r["id_service"],
-            IdPresupuesto = r["id_presupuesto"] as int?
+            InvoiceId = (int)r["id_factura"],
+            Number    = r["numero"].ToString()!,
+            Date      = r["fecha"].ToString()!,
+            Total     = (decimal)r["total"],
+            Status    = r["estado"].ToString()!,
+            ServiceId = (int)r["id_service"],
+            BudgetId  = r["id_presupuesto"] as int?
         };
     }
 }

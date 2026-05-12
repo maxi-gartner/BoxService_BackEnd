@@ -1,8 +1,8 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using BoxService_BackEnd.Services; 
 using BoxService_BackEnd.Models;
+using BoxService_BackEnd.Services;
 
 namespace BoxService_BackEnd.Controllers
 {
@@ -26,7 +26,7 @@ namespace BoxService_BackEnd.Controllers
             var vehicle = await _service.GetByIdAsync(id);
             if (vehicle is null)
             {
-                ResponseHelper.WriteError(context.Response, 404, "Vehículo no encontrado.");
+                ResponseHelper.WriteError(context.Response, 404, "Vehicle not found.");
                 return;
             }
             ResponseHelper.WriteResponse(context.Response, 200, vehicle);
@@ -34,17 +34,17 @@ namespace BoxService_BackEnd.Controllers
 
         public async Task SearchByPlateAsync(HttpListenerContext context)
         {
-            var plate = context.Request.QueryString["patente"];
+            var plate = context.Request.QueryString["plate"];
             if (string.IsNullOrWhiteSpace(plate))
             {
-                ResponseHelper.WriteError(context.Response, 400, "El parámetro 'patente' es obligatorio.");
+                ResponseHelper.WriteError(context.Response, 400, "Query param 'plate' is required.");
                 return;
             }
 
             var vehicle = await _service.FindByPlateAsync(plate.Trim());
             if (vehicle is null)
             {
-                ResponseHelper.WriteError(context.Response, 404, "Vehículo no encontrado.");
+                ResponseHelper.WriteError(context.Response, 404, "Vehicle not found.");
                 return;
             }
             ResponseHelper.WriteResponse(context.Response, 200, vehicle);
@@ -55,7 +55,7 @@ namespace BoxService_BackEnd.Controllers
             var request = await ResponseHelper.ReadJsonBodyAsync<VehicleCreateRequest>(context.Request);
             if (request is null)
             {
-                ResponseHelper.WriteError(context.Response, 400, "Body JSON inválido o vacío.");
+                ResponseHelper.WriteError(context.Response, 400, "Invalid or empty JSON body.");
                 return;
             }
 
@@ -74,14 +74,14 @@ namespace BoxService_BackEnd.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creando vehículo: {ex}");
-                ResponseHelper.WriteError(context.Response, 500, "Error interno al crear el vehículo.");
+                Console.WriteLine($"Error creating vehicle: {ex}");
+                ResponseHelper.WriteError(context.Response, 500, "Internal error creating vehicle.");
             }
         }
 
         public Task GetVehicleHistoryAsync(HttpListenerContext context)
         {
-            ResponseHelper.WriteError(context.Response, 501, "Historial de vehículo aún no implementado.");
+            ResponseHelper.WriteError(context.Response, 501, "Vehicle history not implemented yet.");
             return Task.CompletedTask;
         }
     }

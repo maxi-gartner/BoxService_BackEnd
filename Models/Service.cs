@@ -1,27 +1,34 @@
 namespace BoxService_BackEnd.Models
 {
-    // ROL D — Oscar
-    // Representa un service realizado a un vehículo
+    // ROL D â€” Oscar
     public class Service
     {
-        public int IdService { get; set; }
+        public int      ServiceId   { get; set; }
+        public DateTime Date        { get; set; }
+        public int      Mileage     { get; set; }
+        public string   ServiceType { get; set; } = string.Empty;
+        public string   Notes       { get; set; } = string.Empty;
+        public int      NextMileage { get; set; }
+        public DateTime NextDate    { get; set; }
+        public int      VehicleId   { get; set; }
+        public int?     BudgetId    { get; set; }
+    }
 
-        public DateTime Fecha { get; set; }
+    public class ServiceDetail
+    {
+        public int    DetailId    { get; set; }
+        public int    ServiceId   { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public bool   Done        { get; set; } = true;
+    }
 
-        public int Kilometraje { get; set; }
-
-        public string TipoService { get; set; } = string.Empty;
-
-        public string Observaciones { get; set; } = string.Empty;
-
-        // Calculados en la lógica de negocio
-        public int ProximoKm { get; set; }
-
-        public DateTime ProximaFecha { get; set; }
-
-        // Relaciones
-        public int IdVehiculo { get; set; }
-
-        public int? IdPresupuesto { get; set; }
+    public class ServiceCreateRequest
+    {
+        public DateTime Date        { get; set; }
+        public int      Mileage     { get; set; }
+        public string   ServiceType { get; set; } = string.Empty;
+        public string   Notes       { get; set; } = string.Empty;
+        public int      VehicleId   { get; set; }
+        public int?     BudgetId    { get; set; }
     }
 }

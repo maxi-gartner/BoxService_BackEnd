@@ -56,7 +56,7 @@ namespace BoxService_BackEnd.Repositories
             return ReadVehicle(reader);
         }
 
-        public async Task<Vehicle?> GetByPlateAsync(string patente)
+        public async Task<Vehicle?> GetByPlateAsync(string plate)
         {
             await using var connection = new NpgsqlConnection(_connectionString);
             await connection.OpenAsync();
@@ -68,7 +68,7 @@ namespace BoxService_BackEnd.Repositories
             ";
 
             await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("patente", patente);
+            command.Parameters.AddWithValue("patente", plate);
 
             await using var reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
@@ -88,30 +88,30 @@ namespace BoxService_BackEnd.Repositories
             ";
 
             await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("id_cliente", vehicle.ClienteId);
-            command.Parameters.AddWithValue("marca",      vehicle.Marca);
-            command.Parameters.AddWithValue("modelo",     vehicle.Modelo);
-            command.Parameters.AddWithValue("anio",       vehicle.Anio.HasValue ? (object)vehicle.Anio.Value : DBNull.Value);
-            command.Parameters.AddWithValue("patente",    vehicle.Patente);
+            command.Parameters.AddWithValue("id_cliente", vehicle.ClientId);
+            command.Parameters.AddWithValue("marca",      vehicle.Brand);
+            command.Parameters.AddWithValue("modelo",     vehicle.Model);
+            command.Parameters.AddWithValue("anio",       vehicle.Year.HasValue ? (object)vehicle.Year.Value : DBNull.Value);
+            command.Parameters.AddWithValue("patente",    vehicle.Plate);
 
             await using var reader = await command.ExecuteReaderAsync();
             await reader.ReadAsync();
 
-            vehicle.VehiculoId = reader.GetInt32(0);
-            vehicle.CreadoEn   = reader.GetDateTime(1);
+            vehicle.VehicleId = reader.GetInt32(0);
+            vehicle.CreatedAt = reader.GetDateTime(1);
 
             return vehicle;
         }
 
         private static Vehicle ReadVehicle(NpgsqlDataReader reader) => new()
         {
-            VehiculoId = reader.GetInt32(reader.GetOrdinal("id_vehiculo")),
-            ClienteId  = reader.GetInt32(reader.GetOrdinal("id_cliente")),
-            Marca      = reader.GetString(reader.GetOrdinal("marca")),
-            Modelo     = reader.GetString(reader.GetOrdinal("modelo")),
-            Anio       = reader.IsDBNull(reader.GetOrdinal("anio")) ? null : reader.GetInt32(reader.GetOrdinal("anio")),
-            Patente    = reader.GetString(reader.GetOrdinal("patente")),
-            CreadoEn   = reader.GetDateTime(reader.GetOrdinal("created_at"))
+            VehicleId = reader.GetInt32(reader.GetOrdinal("id_vehiculo")),
+            ClientId  = reader.GetInt32(reader.GetOrdinal("id_cliente")),
+            Brand     = reader.GetString(reader.GetOrdinal("marca")),
+            Model     = reader.GetString(reader.GetOrdinal("modelo")),
+            Year      = reader.IsDBNull(reader.GetOrdinal("anio")) ? null : reader.GetInt32(reader.GetOrdinal("anio")),
+            Plate     = reader.GetString(reader.GetOrdinal("patente")),
+            CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
         };
     }
 }

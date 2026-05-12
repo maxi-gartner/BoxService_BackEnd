@@ -21,34 +21,34 @@ namespace BoxService_BackEnd.Services
         public Task<Vehicle?> GetByIdAsync(int id)
             => _repository.GetByIdAsync(id);
 
-        public Task<Vehicle?> FindByPlateAsync(string patente)
-            => _repository.GetByPlateAsync(patente);
+        public Task<Vehicle?> FindByPlateAsync(string plate)
+            => _repository.GetByPlateAsync(plate);
 
         public async Task<Vehicle> CreateAsync(VehicleCreateRequest request)
         {
-            if (request.ClienteId <= 0)
-                throw new ArgumentException("El id_cliente es obligatorio y debe ser mayor que 0.");
+            if (request.ClientId <= 0)
+                throw new ArgumentException("client_id is required and must be greater than 0.");
 
-            if (string.IsNullOrWhiteSpace(request.Marca))
-                throw new ArgumentException("La marca es obligatoria.");
+            if (string.IsNullOrWhiteSpace(request.Brand))
+                throw new ArgumentException("Brand is required.");
 
-            if (string.IsNullOrWhiteSpace(request.Modelo))
-                throw new ArgumentException("El modelo es obligatorio.");
+            if (string.IsNullOrWhiteSpace(request.Model))
+                throw new ArgumentException("Model is required.");
 
-            if (string.IsNullOrWhiteSpace(request.Patente))
-                throw new ArgumentException("La patente es obligatoria.");
+            if (string.IsNullOrWhiteSpace(request.Plate))
+                throw new ArgumentException("Plate is required.");
 
-            var existing = await _repository.GetByPlateAsync(request.Patente);
+            var existing = await _repository.GetByPlateAsync(request.Plate);
             if (existing != null)
-                throw new InvalidOperationException("Ya existe un vehículo con esa patente.");
+                throw new InvalidOperationException("A vehicle with that plate already exists.");
 
             var vehicle = new Vehicle
             {
-                ClienteId = request.ClienteId,
-                Marca     = request.Marca.Trim(),
-                Modelo    = request.Modelo.Trim(),
-                Anio      = request.Anio,
-                Patente   = request.Patente.Trim().ToUpperInvariant()
+                ClientId = request.ClientId,
+                Brand    = request.Brand.Trim(),
+                Model    = request.Model.Trim(),
+                Year     = request.Year,
+                Plate    = request.Plate.Trim().ToUpperInvariant()
             };
 
             return await _repository.CreateAsync(vehicle);

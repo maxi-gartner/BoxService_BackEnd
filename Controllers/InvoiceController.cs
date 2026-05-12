@@ -4,47 +4,47 @@ using BoxService_BackEnd.Services;
 
 namespace BoxService_BackEnd.Controllers
 {
-    public class FacturasController
+    public class InvoiceController
     {
-        private readonly FacturasService _service = new();
+        private readonly InvoiceService _service = new();
 
         public void GetAll(HttpListenerResponse response)
         {
-            var lista = _service.GetAll();
-            ResponseHelper.Ok(response, lista);
+            var list = _service.GetAll();
+            ResponseHelper.Ok(response, list);
         }
 
         public void GetById(HttpListenerRequest request, HttpListenerResponse response)
         {
             var id = ParseId(request.Url?.AbsolutePath);
-            if (id == null) { ResponseHelper.BadRequest(response, "ID inválido"); return; }
+            if (id == null) { ResponseHelper.BadRequest(response, "Invalid ID"); return; }
 
-            var factura = _service.GetById(id.Value);
-            if (factura == null) { ResponseHelper.NotFound(response, "Factura no encontrada"); return; }
+            var invoice = _service.GetById(id.Value);
+            if (invoice == null) { ResponseHelper.NotFound(response, "Invoice not found"); return; }
 
-            ResponseHelper.Ok(response, factura);
+            ResponseHelper.Ok(response, invoice);
         }
 
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
         {
             var body = new StreamReader(request.InputStream).ReadToEnd();
-            var (ok, error, resultado) = _service.Create(body);
+            var (ok, error, result) = _service.Create(body);
             if (!ok) { ResponseHelper.BadRequest(response, error); return; }
-            ResponseHelper.Created(response, resultado!);
+            ResponseHelper.Created(response, result!);
         }
 
-        public void CambiarEstado(HttpListenerRequest request, HttpListenerResponse response)
+        public void UpdateStatus(HttpListenerRequest request, HttpListenerResponse response)
         {
             var id = ParseId(request.Url?.AbsolutePath);
-            if (id == null) { ResponseHelper.BadRequest(response, "ID inválido"); return; }
+            if (id == null) { ResponseHelper.BadRequest(response, "Invalid ID"); return; }
 
             var body = new StreamReader(request.InputStream).ReadToEnd();
-            var (ok, error) = _service.CambiarEstado(id.Value, body);
+            var (ok, error) = _service.UpdateStatus(id.Value, body);
             if (!ok) { ResponseHelper.BadRequest(response, error); return; }
-            ResponseHelper.Ok(response, new { message = "Estado actualizado" });
+            ResponseHelper.Ok(response, new { message = "Status updated" });
         }
 
-        // /api/facturas/5  → "5"
+        // /api/invoices/5 → "5"
         private static int? ParseId(string? path)
         {
             if (path == null) return null;

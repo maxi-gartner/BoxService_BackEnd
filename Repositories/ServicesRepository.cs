@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Npgsql;
 using BoxService_BackEnd.Database;
@@ -6,136 +6,71 @@ using BoxService_BackEnd.Models;
 
 namespace BoxService_BackEnd.Repositories
 {
-    /// <summary>
-    /// Repository de Services
-    /// Solo acceso a datos — sin lógica de negocio.
-    /// </summary>
     public class ServicesRepository
     {
         public List<Service> GetAll()
         {
             var services = new List<Service>();
-
             using var connection = DatabaseConnection.GetConnection();
-
-            var sql = @"
-                SELECT
-                    id_service,
-                    fecha,
-                    kilometraje,
-                    tipo_service,
-                    observaciones,
-                    proximo_km,
-                    proxima_fecha,
-                    id_vehiculo,
-                    id_presupuesto
+            const string sql = @"
+                SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
+                       proximo_km, proxima_fecha, id_vehiculo, id_presupuesto
                 FROM services
-                ORDER BY fecha DESC;
-            ";
-
+                ORDER BY fecha DESC;";
             using var command = new NpgsqlCommand(sql, connection);
             using var reader  = command.ExecuteReader();
-
-            while (reader.Read())
-                services.Add(MapService(reader));
-
+            while (reader.Read()) services.Add(MapService(reader));
             return services;
         }
 
         public Service? GetById(int id)
         {
             using var connection = DatabaseConnection.GetConnection();
-
-            var sql = @"
-                SELECT
-                    id_service,
-                    fecha,
-                    kilometraje,
-                    tipo_service,
-                    observaciones,
-                    proximo_km,
-                    proxima_fecha,
-                    id_vehiculo,
-                    id_presupuesto
+            const string sql = @"
+                SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
+                       proximo_km, proxima_fecha, id_vehiculo, id_presupuesto
                 FROM services
-                WHERE id_service = @id_service;
-            ";
-
+                WHERE id_service = @id;";
             using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@id_service", id);
-
+            command.Parameters.AddWithValue("id", id);
             using var reader = command.ExecuteReader();
-
-            if (reader.Read())
-                return MapService(reader);
-
-            return null;
+            return reader.Read() ? MapService(reader) : null;
         }
 
         public Service Create(Service service)
         {
             using var connection = DatabaseConnection.GetConnection();
-
-            var sql = @"
-                INSERT INTO services
-                (
-                    fecha,
-                    kilometraje,
-                    tipo_service,
-                    observaciones,
-                    proximo_km,
-                    proxima_fecha,
-                    id_vehiculo,
-                    id_presupuesto
-                )
-                VALUES
-                (
-                    @fecha,
-                    @kilometraje,
-                    @tipo_service,
-                    @observaciones,
-                    @proximo_km,
-                    @proxima_fecha,
-                    @id_vehiculo,
-                    @id_presupuesto
-                )
-                RETURNING id_service;
-            ";
-
+            const string sql = @"
+                INSERT INTO services (fecha, kilometraje, tipo_service, observaciones,
+                                      proximo_km, proxima_fecha, id_vehiculo, id_presupuesto)
+                VALUES (@fecha, @kilometraje, @tipo_service, @observaciones,
+                        @proximo_km, @proxima_fecha, @id_vehiculo, @id_presupuesto)
+                RETURNING id_service;";
             using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@fecha",          service.Fecha);
-            command.Parameters.AddWithValue("@kilometraje",    service.Kilometraje);
-            command.Parameters.AddWithValue("@tipo_service",   service.TipoService);
-            command.Parameters.AddWithValue("@observaciones",  service.Observaciones);
-            command.Parameters.AddWithValue("@proximo_km",     service.ProximoKm);
-            command.Parameters.AddWithValue("@proxima_fecha",  service.ProximaFecha);
-            command.Parameters.AddWithValue("@id_vehiculo",    service.IdVehiculo);
-            command.Parameters.AddWithValue("@id_presupuesto",
-                service.IdPresupuesto.HasValue ? (object)service.IdPresupuesto.Value : DBNull.Value);
-
-            service.IdService = Convert.ToInt32(command.ExecuteScalar());
-
+            command.Parameters.AddWithValue("fecha",          service.Date);
+            command.Parameters.AddWithValue("kilometraje",    service.Mileage);
+            command.Parameters.AddWithValue("tipo_service",   service.ServiceType);
+            command.Parameters.AddWithValue("observaciones",  service.Notes);
+            command.Parameters.AddWithValue("proximo_km",     service.NextMileage);
+            command.Parameters.AddWithValue("proxima_fecha",  service.NextDate);
+            command.Parameters.AddWithValue("id_vehiculo",    service.VehicleId);
+            command.Parameters.AddWithValue("id_presupuesto",
+                service.BudgetId.HasValue ? (object)service.BudgetId.Value : DBNull.Value);
+            service.ServiceId = Convert.ToInt32(command.ExecuteScalar());
             return service;
         }
 
-        private static Service MapService(NpgsqlDataReader reader) => new()
+        private static Service MapService(NpgsqlDataReader r) => new()
         {
-            IdService   = reader.GetInt32(reader.GetOrdinal("id_service")),
-            Fecha       = reader.GetDateTime(reader.GetOrdinal("fecha")),
-            Kilometraje = reader.GetInt32(reader.GetOrdinal("kilometraje")),
-            TipoService = reader.GetString(reader.GetOrdinal("tipo_service")),
-
-            Observaciones = reader.IsDBNull(reader.GetOrdinal("observaciones"))
-                ? string.Empty
-                : reader.GetString(reader.GetOrdinal("observaciones")),
-
-            ProximoKm   = reader.GetInt32(reader.GetOrdinal("proximo_km")),
-            ProximaFecha = reader.GetDateTime(reader.GetOrdinal("proxima_fecha")),
-            IdVehiculo  = reader.GetInt32(reader.GetOrdinal("id_vehiculo")),
-
-            IdPresupuesto = reader.IsDBNull(reader.GetOrdinal("id_presupuesto"))
-                ? null
-                : reader.GetInt32(reader.GetOrdinal("id_presupuesto"))
+            ServiceId   = r.GetInt32(r.GetOrdinal("id_service")),
+            Date        = r.GetDateTime(r.GetOrdinal("fecha")),
+            Mileage     = r.GetInt32(r.GetOrdinal("kilometraje")),
+            ServiceType = r.GetString(r.GetOrdinal("tipo_service")),
+            Notes       = r.IsDBNull(r.GetOrdinal("observaciones")) ? string.Empty : r.GetString(r.GetOrdinal("observaciones")),
+            NextMileage = r.GetInt32(r.GetOrdinal("proximo_km")),
+            NextDate    = r.GetDateTime(r.GetOrdinal("proxima_fecha")),
+            VehicleId   = r.GetInt32(r.GetOrdinal("id_vehiculo")),
+            BudgetId    = r.IsDBNull(r.GetOrdinal("id_presupuesto")) ? null : r.GetInt32(r.GetOrdinal("id_presupuesto"))
         };
     }
 }

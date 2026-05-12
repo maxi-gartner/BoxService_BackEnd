@@ -7,25 +7,24 @@ namespace BoxService_BackEnd
 {
     public class Router
     {
-        private readonly HealthController       _health;
-        private readonly PresupuestosController _presupuestos;
-        private readonly FacturasController     _facturas;
-        private readonly VehicleController      _vehiculos;
-        private readonly ServicesController     _services;
+        private readonly HealthController  _health;
+        private readonly BudgetController  _budgets;
+        private readonly InvoiceController _invoices;
+        private readonly VehicleController _vehicles;
+        private readonly ServicesController _services;
 
         // Cristhian descomenta cuando conecte su controller:
-        // private readonly ClientesController  _clientes;
+        // private readonly ClientController _clients;
 
         public Router(VehicleController vehicleController)
         {
-            _health       = new HealthController();
-            _presupuestos = new PresupuestosController();
-            _facturas     = new FacturasController();
-            _vehiculos    = vehicleController;
-            _services     = new ServicesController();
+            _health   = new HealthController();
+            _budgets  = new BudgetController();
+            _invoices = new InvoiceController();
+            _vehicles = vehicleController;
+            _services = new ServicesController();
 
-            // Cristhian:
-            // _clientes = new ClientesController();
+            // _clients = new ClientController();
         }
 
         public async Task RouteAsync(HttpListenerContext context)
@@ -51,76 +50,70 @@ namespace BoxService_BackEnd
                     return;
                 }
 
-                // ── CLIENTES (Cristhian — descomentar al conectar) ───
-                // if (path.StartsWith("/api/clientes"))
+                // ── CLIENTS (Cristhian — uncomment when ready) ───────
+                // if (path.StartsWith("/api/clients"))
                 // {
-                //     if (method == "GET" && path == "/api/clientes")           { _clientes.GetAll(response);           return; }
-                //     if (method == "GET" && path.Contains("/vehiculos"))        { _clientes.GetVehiculos(request, response); return; }
-                //     if (method == "GET" && path.StartsWith("/api/clientes/"))  { _clientes.GetById(request, response);  return; }
-                //     if (method == "POST" && path == "/api/clientes")           { _clientes.Create(request, response);   return; }
-                //     ResponseHelper.NotFound(response, "Ruta de clientes no válida");
+                //     if (method == "GET"  && path == "/api/clients")          { _clients.GetAll(response);            return; }
+                //     if (method == "GET"  && path.Contains("/vehicles"))       { _clients.GetVehicles(request, response); return; }
+                //     if (method == "GET"  && path.StartsWith("/api/clients/")) { _clients.GetById(request, response);  return; }
+                //     if (method == "POST" && path == "/api/clients")           { _clients.Create(request, response);   return; }
+                //     ResponseHelper.NotFound(response, "Client route not found");
                 //     return;
                 // }
 
-                // ── VEHÍCULOS (Leo) ──────────────────────────────────
+                // ── VEHICLES (Leo) ───────────────────────────────────
                 if (path.StartsWith("/api/vehiculos"))
                 {
                     if (method == "GET" && path == "/api/vehiculos")
-                        await _vehiculos.GetAllAsync(context);
-
+                        await _vehicles.GetAllAsync(context);
                     else if (method == "GET" && path.Contains("/buscar"))
-                        await _vehiculos.SearchByPlateAsync(context);
-
+                        await _vehicles.SearchByPlateAsync(context);
                     else if (method == "GET" && path.EndsWith("/historial"))
-                        await _vehiculos.GetVehicleHistoryAsync(context);
-
+                        await _vehicles.GetVehicleHistoryAsync(context);
                     else if (method == "POST" && path == "/api/vehiculos")
-                        await _vehiculos.CreateAsync(context);
-
+                        await _vehicles.CreateAsync(context);
                     else if (TryGetId(path, "/api/vehiculos/", out int id))
-                        await _vehiculos.GetByIdAsync(context, id);
-
+                        await _vehicles.GetByIdAsync(context, id);
                     else
-                        ResponseHelper.NotFound(response, "Ruta de vehículos no válida");
-
+                        ResponseHelper.NotFound(response, "Vehicle route not found");
                     return;
                 }
 
-                // ── PRESUPUESTOS (Maxi) ──────────────────────────────
-                if (path.StartsWith("/api/presupuestos"))
+                // ── BUDGETS (Maxi) ───────────────────────────────────
+                if (path.StartsWith("/api/budgets"))
                 {
-                    if (method == "GET" && path == "/api/presupuestos")           { _presupuestos.GetAll(response);              return; }
-                    if (method == "GET" && path.StartsWith("/api/presupuestos/")) { _presupuestos.GetById(request, response);    return; }
-                    if (method == "POST" && path == "/api/presupuestos")          { _presupuestos.Create(request, response);     return; }
-                    if (method == "PUT"  && path.Contains("/estado"))             { _presupuestos.CambiarEstado(request, response); return; }
-                    if (method == "POST" && path.Contains("/aprobar"))            { _presupuestos.Aprobar(request, response);    return; }
-                    ResponseHelper.NotFound(response, "Ruta de presupuestos no válida");
+                    if (method == "GET"  && path == "/api/budgets")              { _budgets.GetAll(response);                return; }
+                    if (method == "GET"  && path.StartsWith("/api/budgets/"))    { _budgets.GetById(request, response);      return; }
+                    if (method == "POST" && path == "/api/budgets")              { _budgets.Create(request, response);       return; }
+                    if (method == "PUT"  && path.Contains("/status"))            { _budgets.UpdateStatus(request, response); return; }
+                    if (method == "POST" && path.Contains("/approve"))           { _budgets.Approve(request, response);      return; }
+                    ResponseHelper.NotFound(response, "Budget route not found");
                     return;
                 }
 
-                // ── FACTURAS (Maxi) ──────────────────────────────────
-                if (path.StartsWith("/api/facturas"))
+                // ── INVOICES (Maxi) ──────────────────────────────────
+                if (path.StartsWith("/api/invoices"))
                 {
-                    if (method == "GET"  && path == "/api/facturas")              { _facturas.GetAll(response);                  return; }
-                    if (method == "GET"  && path.StartsWith("/api/facturas/"))    { _facturas.GetById(request, response);        return; }
-                    if (method == "POST" && path == "/api/facturas")              { _facturas.Create(request, response);         return; }
-                    if (method == "PUT"  && path.StartsWith("/api/facturas/"))    { _facturas.CambiarEstado(request, response);  return; }
-                    ResponseHelper.NotFound(response, "Ruta de facturas no válida");
+                    if (method == "GET"  && path == "/api/invoices")             { _invoices.GetAll(response);                return; }
+                    if (method == "GET"  && path.StartsWith("/api/invoices/"))   { _invoices.GetById(request, response);      return; }
+                    if (method == "POST" && path == "/api/invoices")             { _invoices.Create(request, response);       return; }
+                    if (method == "PUT"  && path.StartsWith("/api/invoices/"))   { _invoices.UpdateStatus(request, response); return; }
+                    ResponseHelper.NotFound(response, "Invoice route not found");
                     return;
                 }
 
                 // ── SERVICES (Oscar) ─────────────────────────────────
                 if (path.StartsWith("/api/services"))
                 {
-                    if (method == "GET"  && path == "/api/services")              { _services.GetAll(response);           return; }
-                    if (method == "POST" && path == "/api/services")              { _services.Create(request, response);  return; }
-                    if (method == "GET"  && path.StartsWith("/api/services/"))    { _services.GetById(request, response); return; }
-                    ResponseHelper.NotFound(response, "Ruta de services no válida");
+                    if (method == "GET"  && path == "/api/services")             { _services.GetAll(response);           return; }
+                    if (method == "POST" && path == "/api/services")             { _services.Create(request, response);  return; }
+                    if (method == "GET"  && path.StartsWith("/api/services/"))   { _services.GetById(request, response); return; }
+                    ResponseHelper.NotFound(response, "Service route not found");
                     return;
                 }
 
                 // ── 404 ──────────────────────────────────────────────
-                ResponseHelper.NotFound(response, $"Ruta no encontrada: {method} {path}");
+                ResponseHelper.NotFound(response, $"Route not found: {method} {path}");
             }
             catch (Exception ex)
             {

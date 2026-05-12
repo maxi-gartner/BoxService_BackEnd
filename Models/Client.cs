@@ -1,7 +1,7 @@
 namespace BoxService_BackEnd.Models
 {
     // TODO: Completar por Cristhian (ROL B)
-    public class Cliente
+    public class Client
     {
     }
 }
