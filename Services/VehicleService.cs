@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 
@@ -15,30 +14,24 @@ namespace BoxService_BackEnd.Services
             _repository = repository;
         }
 
-        public Task<IEnumerable<Vehicle>> ListAsync()
-            => _repository.GetAllAsync();
+        public List<Vehicle> List() => _repository.GetAll();
 
-        public Task<Vehicle?> GetByIdAsync(int id)
-            => _repository.GetByIdAsync(id);
+        public Vehicle? GetById(int id) => _repository.GetById(id);
 
-        public Task<Vehicle?> FindByPlateAsync(string plate)
-            => _repository.GetByPlateAsync(plate);
+        public Vehicle? FindByPlate(string plate) => _repository.GetByPlate(plate);
 
-        public async Task<Vehicle> CreateAsync(VehicleCreateRequest request)
+        public Vehicle Create(VehicleCreateRequest request)
         {
             if (request.ClientId <= 0)
                 throw new ArgumentException("client_id is required and must be greater than 0.");
-
             if (string.IsNullOrWhiteSpace(request.Brand))
                 throw new ArgumentException("Brand is required.");
-
             if (string.IsNullOrWhiteSpace(request.Model))
                 throw new ArgumentException("Model is required.");
-
             if (string.IsNullOrWhiteSpace(request.Plate))
                 throw new ArgumentException("Plate is required.");
 
-            var existing = await _repository.GetByPlateAsync(request.Plate);
+            var existing = _repository.GetByPlate(request.Plate);
             if (existing != null)
                 throw new InvalidOperationException("A vehicle with that plate already exists.");
 
@@ -51,7 +44,7 @@ namespace BoxService_BackEnd.Services
                 Plate    = request.Plate.Trim().ToUpperInvariant()
             };
 
-            return await _repository.CreateAsync(vehicle);
+            return _repository.Create(vehicle);
         }
     }
 }

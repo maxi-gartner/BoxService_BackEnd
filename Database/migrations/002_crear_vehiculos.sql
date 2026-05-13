@@ -1,10 +1,12 @@
--- Migración 002: Crear tabla vehiculos
-CREATE TABLE vehiculos (
-    vehiculo_id SERIAL PRIMARY KEY,
-    cliente_id INT NOT NULL REFERENCES clientes(cliente_id),
-    marca VARCHAR(100) NOT NULL,
-    modelo VARCHAR(100) NOT NULL,
-    ano INT,
-    placa VARCHAR(50) UNIQUE NOT NULL,
-    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 002_crear_vehiculos.sql
+CREATE TABLE IF NOT EXISTS vehiculos (
+    id_vehiculo        SERIAL PRIMARY KEY,
+    patente            VARCHAR(10)  NOT NULL UNIQUE,
+    marca              VARCHAR(50)  NOT NULL,
+    modelo             VARCHAR(50)  NOT NULL,
+    anio               INT          NOT NULL,
+    kilometraje_actual INT          NOT NULL DEFAULT 0,
+    id_cliente         INT          NOT NULL REFERENCES clientes(id_cliente),
+    activo             BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMP    NOT NULL DEFAULT NOW()
 );
