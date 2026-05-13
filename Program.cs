@@ -51,5 +51,5 @@ if (args.Contains("--reset"))
 }
 
 // ── Arrancar servidor ────────────────────────────────
-var server = new Server(connectionString);
-await server.StartAsync();
+var server = new Server();
+server.Start();

@@ -1,10 +1,25 @@
--- Migración 004: Crear tabla services
-CREATE TABLE services (
-    service_id SERIAL PRIMARY KEY,
-    presupuesto_id INT NOT NULL REFERENCES presupuestos(presupuesto_id),
-    descripcion TEXT NOT NULL,
-    precio NUMERIC(12,2) NOT NULL DEFAULT 0,
-    realizado BOOLEAN NOT NULL DEFAULT FALSE,
-    fecha_servicio DATE,
-    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 004_crear_services.sql
+CREATE TABLE IF NOT EXISTS services (
+    id_service      SERIAL PRIMARY KEY,
+    fecha           DATE          NOT NULL DEFAULT CURRENT_DATE,
+    kilometraje     INT           NOT NULL,
+    tipo_service    VARCHAR(100)  NOT NULL,
+    observaciones   TEXT,
+    proximo_km      INT,
+    proxima_fecha   DATE,
+    id_vehiculo     INT           NOT NULL REFERENCES vehiculos(id_vehiculo),
+    id_presupuesto  INT           REFERENCES presupuestos(id_presupuesto),
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS detalle_service (
+    id_detalle   SERIAL PRIMARY KEY,
+    id_service   INT           NOT NULL REFERENCES services(id_service),
+    descripcion  VARCHAR(200)  NOT NULL,
+    realizado    BOOLEAN       NOT NULL DEFAULT TRUE
+);
+
+-- FK que cierra el ciclo presupuesto → service
+ALTER TABLE presupuestos
+    ADD CONSTRAINT fk_presupuesto_service
+    FOREIGN KEY (id_service) REFERENCES services(id_service);

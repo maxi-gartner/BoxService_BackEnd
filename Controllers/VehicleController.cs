@@ -1,6 +1,7 @@
 using System;
+using System.IO;
 using System.Net;
-using System.Threading.Tasks;
+using System.Text.Json;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Services;
 
@@ -15,74 +16,70 @@ namespace BoxService_BackEnd.Controllers
             _service = service;
         }
 
-        public async Task GetAllAsync(HttpListenerContext context)
+        public void GetAll(HttpListenerResponse response)
         {
-            var vehicles = await _service.ListAsync();
-            ResponseHelper.WriteResponse(context.Response, 200, vehicles);
+            var vehicles = _service.List();
+            ResponseHelper.Ok(response, vehicles);
         }
 
-        public async Task GetByIdAsync(HttpListenerContext context, int id)
+        public void GetById(HttpListenerRequest request, HttpListenerResponse response, int id)
         {
-            var vehicle = await _service.GetByIdAsync(id);
-            if (vehicle is null)
-            {
-                ResponseHelper.WriteError(context.Response, 404, "Vehicle not found.");
-                return;
-            }
-            ResponseHelper.WriteResponse(context.Response, 200, vehicle);
+            var vehicle = _service.GetById(id);
+            if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
+            ResponseHelper.Ok(response, vehicle);
         }
 
-        public async Task SearchByPlateAsync(HttpListenerContext context)
+        public void SearchByPlate(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var plate = context.Request.QueryString["plate"];
+            var plate = request.QueryString["plate"];
             if (string.IsNullOrWhiteSpace(plate))
             {
-                ResponseHelper.WriteError(context.Response, 400, "Query param 'plate' is required.");
+                ResponseHelper.BadRequest(response, "Query param 'plate' is required.");
                 return;
             }
 
-            var vehicle = await _service.FindByPlateAsync(plate.Trim());
-            if (vehicle is null)
-            {
-                ResponseHelper.WriteError(context.Response, 404, "Vehicle not found.");
-                return;
-            }
-            ResponseHelper.WriteResponse(context.Response, 200, vehicle);
+            var vehicle = _service.FindByPlate(plate.Trim());
+            if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
+            ResponseHelper.Ok(response, vehicle);
         }
 
-        public async Task CreateAsync(HttpListenerContext context)
+        public void Create(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var request = await ResponseHelper.ReadJsonBodyAsync<VehicleCreateRequest>(context.Request);
-            if (request is null)
+            string body;
+            using (var reader = new StreamReader(request.InputStream))
+                body = reader.ReadToEnd();
+
+            VehicleCreateRequest? req;
+            try
             {
-                ResponseHelper.WriteError(context.Response, 400, "Invalid or empty JSON body.");
+                req = JsonSerializer.Deserialize<VehicleCreateRequest>(body,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch
+            {
+                ResponseHelper.BadRequest(response, "Invalid or empty JSON body.");
                 return;
             }
+
+            if (req is null) { ResponseHelper.BadRequest(response, "Invalid JSON body."); return; }
 
             try
             {
-                var created = await _service.CreateAsync(request);
-                ResponseHelper.WriteResponse(context.Response, 201, created);
+                var created = _service.Create(req);
+                ResponseHelper.Created(response, created);
             }
-            catch (ArgumentException ex)
-            {
-                ResponseHelper.WriteError(context.Response, 400, ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                ResponseHelper.WriteError(context.Response, 409, ex.Message);
-            }
+            catch (ArgumentException ex)        { ResponseHelper.BadRequest(response, ex.Message); }
+            catch (InvalidOperationException ex) { ResponseHelper.BadRequest(response, ex.Message); }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error creating vehicle: {ex}");
-                ResponseHelper.WriteError(context.Response, 500, "Internal error creating vehicle.");
+                ResponseHelper.InternalError(response);
             }
         }
 
-        public Task GetVehicleHistoryAsync(HttpListenerContext context)
+        public void GetHistory(HttpListenerResponse response)
         {
-            ResponseHelper.WriteError(context.Response, 501, "Vehicle history not implemented yet.");
-            return Task.CompletedTask;
+            ResponseHelper.NotFound(response, "Vehicle history not implemented yet.");
         }
     }
 }

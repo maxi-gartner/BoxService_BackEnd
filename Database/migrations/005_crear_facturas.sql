@@ -1,9 +1,11 @@
--- Migración 005: Crear tabla facturas
-CREATE TABLE facturas (
-    factura_id SERIAL PRIMARY KEY,
-    presupuesto_id INT NOT NULL REFERENCES presupuestos(presupuesto_id),
-    fecha_factura DATE NOT NULL DEFAULT CURRENT_DATE,
-    total NUMERIC(12,2) NOT NULL,
-    pagada BOOLEAN NOT NULL DEFAULT FALSE,
-    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 005_crear_facturas.sql
+CREATE TABLE IF NOT EXISTS facturas (
+    id_factura      SERIAL PRIMARY KEY,
+    numero          VARCHAR(10)   NOT NULL UNIQUE,
+    fecha           DATE          NOT NULL DEFAULT CURRENT_DATE,
+    total           DECIMAL(10,2) NOT NULL,
+    estado          VARCHAR(20)   NOT NULL DEFAULT 'issued',
+    id_service      INT           NOT NULL REFERENCES services(id_service),
+    id_presupuesto  INT           REFERENCES presupuestos(id_presupuesto),
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
 );

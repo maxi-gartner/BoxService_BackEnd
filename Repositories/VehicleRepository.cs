@@ -1,117 +1,75 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Npgsql;
 using BoxService_BackEnd.Models;
+using BoxService_BackEnd.Database;
 
 namespace BoxService_BackEnd.Repositories
 {
     public class VehicleRepository
     {
-        private readonly string _connectionString;
-
-        public VehicleRepository(string connectionString)
+        public List<Vehicle> GetAll()
         {
-            _connectionString = connectionString;
-        }
-
-        public async Task<IEnumerable<Vehicle>> GetAllAsync()
-        {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            const string sql = @"
-                SELECT id_vehiculo, id_cliente, marca, modelo, anio, patente, created_at
-                FROM vehiculos
-                ORDER BY id_vehiculo;
-            ";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            await using var reader  = await command.ExecuteReaderAsync();
-
             var result = new List<Vehicle>();
-            while (await reader.ReadAsync())
-                result.Add(ReadVehicle(reader));
-
+            using var conn   = DatabaseConnection.GetConnection();
+            using var cmd    = new NpgsqlCommand(@"
+                SELECT id_vehiculo, id_cliente, marca, modelo, anio, patente, created_at
+                FROM vehiculos ORDER BY id_vehiculo;", conn);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) result.Add(MapRow(reader));
             return result;
         }
 
-        public async Task<Vehicle?> GetByIdAsync(int id)
+        public Vehicle? GetById(int id)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            const string sql = @"
+            using var conn   = DatabaseConnection.GetConnection();
+            using var cmd    = new NpgsqlCommand(@"
                 SELECT id_vehiculo, id_cliente, marca, modelo, anio, patente, created_at
-                FROM vehiculos
-                WHERE id_vehiculo = @id;
-            ";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("id", id);
-
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
-
-            return ReadVehicle(reader);
+                FROM vehiculos WHERE id_vehiculo = @id;", conn);
+            cmd.Parameters.AddWithValue("id", id);
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? MapRow(reader) : null;
         }
 
-        public async Task<Vehicle?> GetByPlateAsync(string plate)
+        public Vehicle? GetByPlate(string plate)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            const string sql = @"
+            using var conn   = DatabaseConnection.GetConnection();
+            using var cmd    = new NpgsqlCommand(@"
                 SELECT id_vehiculo, id_cliente, marca, modelo, anio, patente, created_at
-                FROM vehiculos
-                WHERE patente = @patente;
-            ";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("patente", plate);
-
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
-
-            return ReadVehicle(reader);
+                FROM vehiculos WHERE patente = @patente;", conn);
+            cmd.Parameters.AddWithValue("patente", plate);
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? MapRow(reader) : null;
         }
 
-        public async Task<Vehicle> CreateAsync(Vehicle vehicle)
+        public Vehicle Create(Vehicle vehicle)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
-            await connection.OpenAsync();
-
-            const string sql = @"
+            using var conn   = DatabaseConnection.GetConnection();
+            using var cmd    = new NpgsqlCommand(@"
                 INSERT INTO vehiculos (id_cliente, marca, modelo, anio, patente)
                 VALUES (@id_cliente, @marca, @modelo, @anio, @patente)
-                RETURNING id_vehiculo, created_at;
-            ";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("id_cliente", vehicle.ClientId);
-            command.Parameters.AddWithValue("marca",      vehicle.Brand);
-            command.Parameters.AddWithValue("modelo",     vehicle.Model);
-            command.Parameters.AddWithValue("anio",       vehicle.Year.HasValue ? (object)vehicle.Year.Value : DBNull.Value);
-            command.Parameters.AddWithValue("patente",    vehicle.Plate);
-
-            await using var reader = await command.ExecuteReaderAsync();
-            await reader.ReadAsync();
-
+                RETURNING id_vehiculo, created_at;", conn);
+            cmd.Parameters.AddWithValue("id_cliente", vehicle.ClientId);
+            cmd.Parameters.AddWithValue("marca",      vehicle.Brand);
+            cmd.Parameters.AddWithValue("modelo",     vehicle.Model);
+            cmd.Parameters.AddWithValue("anio",       vehicle.Year.HasValue ? (object)vehicle.Year.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("patente",    vehicle.Plate);
+            using var reader = cmd.ExecuteReader();
+            reader.Read();
             vehicle.VehicleId = reader.GetInt32(0);
             vehicle.CreatedAt = reader.GetDateTime(1);
-
             return vehicle;
         }
 
-        private static Vehicle ReadVehicle(NpgsqlDataReader reader) => new()
+        private static Vehicle MapRow(NpgsqlDataReader r) => new()
         {
-            VehicleId = reader.GetInt32(reader.GetOrdinal("id_vehiculo")),
-            ClientId  = reader.GetInt32(reader.GetOrdinal("id_cliente")),
-            Brand     = reader.GetString(reader.GetOrdinal("marca")),
-            Model     = reader.GetString(reader.GetOrdinal("modelo")),
-            Year      = reader.IsDBNull(reader.GetOrdinal("anio")) ? null : reader.GetInt32(reader.GetOrdinal("anio")),
-            Plate     = reader.GetString(reader.GetOrdinal("patente")),
-            CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at"))
+            VehicleId = r.GetInt32(r.GetOrdinal("id_vehiculo")),
+            ClientId  = r.GetInt32(r.GetOrdinal("id_cliente")),
+            Brand     = r.GetString(r.GetOrdinal("marca")),
+            Model     = r.GetString(r.GetOrdinal("modelo")),
+            Year      = r.IsDBNull(r.GetOrdinal("anio")) ? null : r.GetInt32(r.GetOrdinal("anio")),
+            Plate     = r.GetString(r.GetOrdinal("patente")),
+            CreatedAt = r.GetDateTime(r.GetOrdinal("created_at"))
         };
     }
 }

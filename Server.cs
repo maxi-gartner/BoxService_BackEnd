@@ -1,35 +1,55 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using BoxService_BackEnd.Database;
+
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
 using BoxService_BackEnd.Controllers;
+using BoxService_BackEnd.Router;
 
 namespace BoxService_BackEnd
 {
     public class Server
     {
         private readonly HttpListener _listener;
-        private readonly Router _router;
+        private readonly IndexRouter _router;
+
         private const string Prefix = "http://localhost:5001/";
 
-        public Server(string connectionString)
+        public Server()
         {
             _listener = new HttpListener();
             _listener.Prefixes.Add(Prefix);
 
-            // Vehículos — inyección de dependencias
-            var vehicleRepository  = new VehicleRepository(connectionString);
-            var vehicleService     = new VehicleService(vehicleRepository);
-            var vehicleController  = new VehicleController(vehicleService);
+            // ── VEHICLES ─────────────────────────────
 
-            _router = new Router(vehicleController);
+            var vehicleRepository = new VehicleRepository();
+            var vehicleService    = new VehicleService(vehicleRepository);
+            var vehicleController = new VehicleController(vehicleService);
+            var vehicleRouter     = new VehicleRouter(vehicleController);
+
+            // ── OTHER ROUTERS ───────────────────────
+
+            var budgetRouter  = new BudgetRouter();
+            var invoiceRouter = new InvoiceRouter();
+            var serviceRouter = new ServiceRouter();
+            var healthRouter  = new HealthRouter();
+
+            // ── MAIN ROUTER ─────────────────────────
+
+            _router = new IndexRouter(
+                vehicleRouter,
+                budgetRouter,
+                invoiceRouter,
+                serviceRouter,
+                healthRouter
+            );
         }
 
-        public async Task StartAsync()
+        public void Start()
         {
             _listener.Start();
+
             Console.WriteLine($"BoxService corriendo en {Prefix}");
             Console.WriteLine("Presioná Ctrl+C para detener...\n");
 
@@ -37,28 +57,29 @@ namespace BoxService_BackEnd
             {
                 try
                 {
-                    var context = await _listener.GetContextAsync();
-                    _ = Task.Run(() => HandleContextAsync(context));
+                    var context = _listener.GetContext();
+
+                    Task.Run(() => HandleRequest(context));
                 }
                 catch (HttpListenerException ex)
                 {
                     Console.WriteLine($"Listener detenido: {ex.Message}");
+                    break;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error aceptando request: {ex.Message}");
+                    Console.WriteLine($"Error: {ex.Message}");
                 }
             }
         }
 
-        private async Task HandleContextAsync(HttpListenerContext context)
+        private void HandleRequest(HttpListenerContext context)
         {
             var request  = context.Request;
             var response = context.Response;
 
             try
             {
-                // CORS
                 response.Headers.Add("Access-Control-Allow-Origin", "*");
                 response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -72,16 +93,19 @@ namespace BoxService_BackEnd
 
                 Console.WriteLine($"[{request.HttpMethod}] {request.Url?.AbsolutePath}");
 
-                await _router.RouteAsync(context);
+                _router.Route(context);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] {ex.Message}");
-                ResponseHelper.InternalError(response);
-            }
-            finally
-            {
-                try { response.OutputStream.Close(); } catch { }
+                Console.WriteLine($"[ERROR] {ex}");
+
+                try
+                {
+                    ResponseHelper.InternalError(response);
+                }
+                catch
+                {
+                }
             }
         }
 
