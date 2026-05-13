@@ -43,7 +43,7 @@ namespace BoxService_BackEnd.Repositories
         }
 
         /// <summary>
-        /// Transacción ACID — emitir factura:
+        /// Transacción ACID:
         /// 1. Inserta la factura
         /// 2. Actualiza el service
         /// </summary>
@@ -53,7 +53,6 @@ namespace BoxService_BackEnd.Repositories
             using var tx   = conn.BeginTransaction();
             try
             {
-                // PASO 1 — insertar factura
                 using var cmdInvoice = new NpgsqlCommand(@"
                     INSERT INTO facturas (numero, fecha, total, estado, id_service, id_presupuesto)
                     VALUES (@numero, @fecha, @total, 'issued', @id_service, @id_presupuesto)
@@ -65,7 +64,6 @@ namespace BoxService_BackEnd.Repositories
                 cmdInvoice.Parameters.AddWithValue("id_presupuesto", (object?)inv.BudgetId ?? DBNull.Value);
                 var invoiceId = (int)cmdInvoice.ExecuteScalar()!;
 
-                // PASO 2 — marcar service
                 using var cmdService = new NpgsqlCommand(
                     "UPDATE services SET tipo_service = tipo_service WHERE id_service = @id", conn, tx);
                 cmdService.Parameters.AddWithValue("id", inv.ServiceId);

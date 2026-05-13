@@ -44,7 +44,6 @@ namespace BoxService_BackEnd.Controllers
             ResponseHelper.Ok(response, new { message = "Status updated" });
         }
 
-        // /api/invoices/5 → "5"
         private static int? ParseId(string? path)
         {
             if (path == null) return null;

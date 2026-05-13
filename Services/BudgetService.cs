@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using BoxService_BackEnd.Database;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 
@@ -64,7 +65,7 @@ namespace BoxService_BackEnd.Services
                 var id = _repo.Create(budget);
                 budget.BudgetId = id;
 
-                using var conn = Database.DatabaseConnection.GetConnection();
+                using var conn = DatabaseConnection.GetConnection();
                 using var tx   = conn.BeginTransaction();
                 foreach (var d in details)
                 {
@@ -100,9 +101,9 @@ namespace BoxService_BackEnd.Services
         public (bool ok, string error, object? result) Approve(int id)
         {
             var budget = _repo.GetById(id);
-            if (budget == null)                  return (false, "Budget not found", null);
-            if (budget.Status == "approved")     return (false, "Budget already approved", null);
-            if (budget.Status == "rejected")     return (false, "Cannot approve a rejected budget", null);
+            if (budget == null)               return (false, "Budget not found", null);
+            if (budget.Status == "approved")  return (false, "Budget already approved", null);
+            if (budget.Status == "rejected")  return (false, "Cannot approve a rejected budget", null);
 
             var details   = _repo.GetDetails(id);
             var serviceId = _repo.ApproveWithTransaction(id, details, budget.VehicleId);
