@@ -1,59 +1,57 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BoxService_BackEnd.Models;
+using BoxService_BackEnd.Repositories;
 
-public class VehicleService
+namespace BoxService_BackEnd.Services
 {
-    private readonly VehicleRepository _repository;
-
-    public VehicleService(VehicleRepository repository)
+    public class VehicleService
     {
-        _repository = repository;
-    }
+        private readonly VehicleRepository _repository;
 
-    public Task<IEnumerable<Vehicle>> ListAsync() => _repository.GetAllAsync();
-
-    public Task<Vehicle?> GetByIdAsync(int id) => _repository.GetByIdAsync(id);
-
-    public Task<Vehicle?> FindByPlateAsync(string plate) => _repository.GetByPlateAsync(plate);
-
-    public async Task<Vehicle> CreateAsync(VehicleCreateRequest request)
-    {
-        if (request.ClienteId <= 0)
+        public VehicleService(VehicleRepository repository)
         {
-            throw new ArgumentException("El cliente_id es obligatorio y debe ser mayor que 0.");
+            _repository = repository;
         }
 
-        if (string.IsNullOrWhiteSpace(request.Marca))
+        public Task<IEnumerable<Vehicle>> ListAsync()
+            => _repository.GetAllAsync();
+
+        public Task<Vehicle?> GetByIdAsync(int id)
+            => _repository.GetByIdAsync(id);
+
+        public Task<Vehicle?> FindByPlateAsync(string plate)
+            => _repository.GetByPlateAsync(plate);
+
+        public async Task<Vehicle> CreateAsync(VehicleCreateRequest request)
         {
-            throw new ArgumentException("La marca es obligatoria.");
+            if (request.ClientId <= 0)
+                throw new ArgumentException("client_id is required and must be greater than 0.");
+
+            if (string.IsNullOrWhiteSpace(request.Brand))
+                throw new ArgumentException("Brand is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Model))
+                throw new ArgumentException("Model is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Plate))
+                throw new ArgumentException("Plate is required.");
+
+            var existing = await _repository.GetByPlateAsync(request.Plate);
+            if (existing != null)
+                throw new InvalidOperationException("A vehicle with that plate already exists.");
+
+            var vehicle = new Vehicle
+            {
+                ClientId = request.ClientId,
+                Brand    = request.Brand.Trim(),
+                Model    = request.Model.Trim(),
+                Year     = request.Year,
+                Plate    = request.Plate.Trim().ToUpperInvariant()
+            };
+
+            return await _repository.CreateAsync(vehicle);
         }
-
-        if (string.IsNullOrWhiteSpace(request.Modelo))
-        {
-            throw new ArgumentException("El modelo es obligatorio.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Placa))
-        {
-            throw new ArgumentException("La patente es obligatoria.");
-        }
-
-        var existing = await _repository.GetByPlateAsync(request.Placa);
-        if (existing != null)
-        {
-            throw new InvalidOperationException("Ya existe un vehículo con esa patente.");
-        }
-
-        var vehicle = new Vehicle
-        {
-            ClienteId = request.ClienteId,
-            Marca = request.Marca.Trim(),
-            Modelo = request.Modelo.Trim(),
-            Ano = request.Ano,
-            Placa = request.Placa.Trim().ToUpperInvariant()
-        };
-
-        return await _repository.CreateAsync(vehicle);
     }
 }

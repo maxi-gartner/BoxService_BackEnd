@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
@@ -9,60 +9,29 @@ namespace BoxService_BackEnd.Controllers
 {
     public class ServicesController
     {
-        private readonly ServicesService _servicesService;
-
-        public ServicesController()
-        {
-            _servicesService = new ServicesService();
-        }
+        private readonly ServicesService _service = new();
 
         public void GetAll(HttpListenerResponse response)
         {
-            var services = _servicesService.GetAll();
-
-            ResponseHelper.Send(response, 200, new
-            {
-                success = true,
-                data = services,
-                error = (object?)null
-            });
+            var services = _service.GetAll();
+            ResponseHelper.Ok(response, services);
         }
 
         public void GetById(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var path  = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
             var parts = path.Split('/');
 
             if (parts.Length < 4 || !int.TryParse(parts[3], out int id))
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "ID de service inválido" }
-                });
+                ResponseHelper.BadRequest(response, "Invalid service ID");
                 return;
             }
 
-            var service = _servicesService.GetById(id);
+            var service = _service.GetById(id);
+            if (service == null) { ResponseHelper.NotFound(response, "Service not found"); return; }
 
-            if (service == null)
-            {
-                ResponseHelper.Send(response, 404, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 404, message = "Service no encontrado" }
-                });
-                return;
-            }
-
-            ResponseHelper.Send(response, 200, new
-            {
-                success = true,
-                data = service,
-                error = (object?)null
-            });
+            ResponseHelper.Ok(response, service);
         }
 
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
@@ -70,45 +39,42 @@ namespace BoxService_BackEnd.Controllers
             using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
             var body = reader.ReadToEnd();
 
-            Service? service;
-
+            ServiceCreateRequest? req;
             try
             {
-                service = JsonSerializer.Deserialize<Service>(body, new JsonSerializerOptions
+                req = JsonSerializer.Deserialize<ServiceCreateRequest>(body, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
             }
             catch
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "JSON inválido" }
-                });
+                ResponseHelper.BadRequest(response, "Invalid JSON");
                 return;
             }
 
-            if (service == null)
+            if (req == null) { ResponseHelper.BadRequest(response, "Invalid service data"); return; }
+
+            // Mapear request a modelo
+            var service = new Service
             {
-                ResponseHelper.Send(response, 400, new
-                {
-                    success = false,
-                    data = (object?)null,
-                    error = new { code = 400, message = "Datos del service inválidos" }
-                });
-                return;
+                Date        = req.Date,
+                Mileage     = req.Mileage,
+                ServiceType = req.ServiceType,
+                Notes       = req.Notes,
+                VehicleId   = req.VehicleId,
+                BudgetId    = req.BudgetId
+            };
+
+            try
+            {
+                var created = _service.Create(service);
+                ResponseHelper.Created(response, created);
             }
-
-            var creado = _servicesService.Create(service);
-
-            ResponseHelper.Send(response, 201, new
+            catch (Exception ex)
             {
-                success = true,
-                data = creado,
-                error = (object?)null
-            });
+                ResponseHelper.BadRequest(response, ex.Message);
+            }
         }
     }
 }

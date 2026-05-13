@@ -1,12 +1,24 @@
 using System;
 
-public class Vehicle
+namespace BoxService_BackEnd.Models
 {
-    public int VehiculoId { get; set; }
-    public int ClienteId { get; set; }
-    public string Marca { get; set; } = null!;
-    public string Modelo { get; set; } = null!;
-    public int? Ano { get; set; }
-    public string Placa { get; set; } = null!;
-    public DateTime CreadoEn { get; set; }
+    public class Vehicle
+    {
+        public int      VehicleId  { get; set; }
+        public int      ClientId   { get; set; }
+        public string   Brand      { get; set; } = null!;
+        public string   Model      { get; set; } = null!;
+        public int?     Year       { get; set; }
+        public string   Plate      { get; set; } = null!;
+        public DateTime CreatedAt  { get; set; }
+    }
+
+    public class VehicleCreateRequest
+    {
+        public int    ClientId { get; set; }
+        public string Brand    { get; set; } = null!;
+        public string Model    { get; set; } = null!;
+        public int?   Year     { get; set; }
+        public string Plate    { get; set; } = null!;
+    }
 }

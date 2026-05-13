@@ -1,6 +1,10 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using BoxService_BackEnd.Database;
+using BoxService_BackEnd.Repositories;
+using BoxService_BackEnd.Services;
+using BoxService_BackEnd.Controllers;
 
 namespace BoxService_BackEnd
 {
@@ -8,25 +12,26 @@ namespace BoxService_BackEnd
     {
         private readonly HttpListener _listener;
         private readonly Router _router;
-        private const string Prefix = "http://localhost:5000/";
+        private const string Prefix = "http://localhost:5001/";
 
         public Server(string connectionString)
         {
             _listener = new HttpListener();
             _listener.Prefixes.Add(Prefix);
 
-            // Inyección de dependencias (tu parte)
-            var repository = new VehicleRepository(connectionString);
-            var service    = new VehicleService(repository);
-            var controller = new VehicleController(service);
+            // Vehículos — inyección de dependencias
+            var vehicleRepository  = new VehicleRepository(connectionString);
+            var vehicleService     = new VehicleService(vehicleRepository);
+            var vehicleController  = new VehicleController(vehicleService);
 
-            _router = new Router(controller);
+            _router = new Router(vehicleController);
         }
 
         public async Task StartAsync()
         {
             _listener.Start();
-            Console.WriteLine($"🚀 BoxService corriendo en {Prefix}");
+            Console.WriteLine($"BoxService corriendo en {Prefix}");
+            Console.WriteLine("Presioná Ctrl+C para detener...\n");
 
             while (_listener.IsListening)
             {
@@ -41,7 +46,7 @@ namespace BoxService_BackEnd
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error aceptando request: {ex}");
+                    Console.WriteLine($"Error aceptando request: {ex.Message}");
                 }
             }
         }
@@ -53,7 +58,7 @@ namespace BoxService_BackEnd
 
             try
             {
-                // ── CORS ─────────────────────────────────────────────
+                // CORS
                 response.Headers.Add("Access-Control-Allow-Origin", "*");
                 response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
                 response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -65,20 +70,18 @@ namespace BoxService_BackEnd
                     return;
                 }
 
-                // ── LOG ──────────────────────────────────────────────
                 Console.WriteLine($"[{request.HttpMethod}] {request.Url?.AbsolutePath}");
 
-                // ── ROUTING ─────────────────────────────────────────
                 await _router.RouteAsync(context);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] {ex}");
+                Console.WriteLine($"[ERROR] {ex.Message}");
                 ResponseHelper.InternalError(response);
             }
             finally
             {
-                response.OutputStream.Close();
+                try { response.OutputStream.Close(); } catch { }
             }
         }
 

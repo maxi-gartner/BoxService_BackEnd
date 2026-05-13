@@ -8,7 +8,31 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Npgsql" Version="8.2.0" />
+    <Folder Include="Database\" />
+    <Folder Include="Controllers\" />
+    <Folder Include="Models\" />
+    <Folder Include="Services\" />
+    <Folder Include="Repositories\" />
+
+    <PackageReference Include="Npgsql" Version="10.0.2" />
+  </ItemGroup>
+
+  <!-- Copia las migraciones SQL al directorio de compilación -->
+  <ItemGroup>
+    <None Update="Database\migrations\*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Copia appsettings.json al directorio de compilación -->
+  <!-- appsettings.json NO va a GitHub — cada uno tiene el suyo -->
+  <ItemGroup>
+    <None Update="appsettings.json" Condition="Exists('appsettings.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.example.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -6,11 +6,11 @@ using Npgsql;
 
 namespace BoxService_BackEnd.Repositories
 {
-    public class PresupuestosRepository
+    public class BudgetRepository
     {
-        public List<Presupuesto> GetAll()
+        public List<Budget> GetAll()
         {
-            var lista = new List<Presupuesto>();
+            var lista = new List<Budget>();
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM presupuestos ORDER BY created_at DESC", conn);
             using var reader = cmd.ExecuteReader();
@@ -18,7 +18,7 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public Presupuesto? GetById(int id)
+        public Budget? GetById(int id)
         {
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM presupuestos WHERE id_presupuesto = @id", conn);
@@ -27,74 +27,80 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
-        public List<DetallePresupuesto> GetDetalles(int idPresupuesto)
+        public List<BudgetDetail> GetDetails(int budgetId)
         {
-            var lista = new List<DetallePresupuesto>();
+            var lista = new List<BudgetDetail>();
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM detalle_presupuesto WHERE id_presupuesto = @id", conn);
-            cmd.Parameters.AddWithValue("id", idPresupuesto);
+            cmd.Parameters.AddWithValue("id", budgetId);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                lista.Add(new DetallePresupuesto
+                lista.Add(new BudgetDetail
                 {
-                    IdDetalle      = (int)reader["id_detalle"],
-                    IdPresupuesto  = (int)reader["id_presupuesto"],
-                    Tipo           = reader["tipo"].ToString()!,
-                    Descripcion    = reader["descripcion"].ToString()!,
-                    Cantidad       = (decimal)reader["cantidad"],
-                    PrecioUnitario = (decimal)reader["precio_unitario"],
-                    Subtotal       = (decimal)reader["subtotal"]
+                    DetailId    = (int)reader["id_detalle"],
+                    BudgetId    = (int)reader["id_presupuesto"],
+                    Type        = reader["tipo"].ToString()!,
+                    Description = reader["descripcion"].ToString()!,
+                    Quantity    = (decimal)reader["cantidad"],
+                    UnitPrice   = (decimal)reader["precio_unitario"],
+                    Subtotal    = (decimal)reader["subtotal"]
                 });
             return lista;
         }
 
-        public string GetUltimoNumero()
+        public string GetLastNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("SELECT numero FROM presupuestos ORDER BY id_presupuesto DESC LIMIT 1", conn);
             return cmd.ExecuteScalar()?.ToString() ?? "P-0000";
         }
 
-        public int Create(Presupuesto p)
+        public int Create(Budget b)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand(@"
                 INSERT INTO presupuestos (numero, fecha, estado, observaciones, id_vehiculo)
                 VALUES (@numero, @fecha, @estado, @observaciones, @id_vehiculo)
                 RETURNING id_presupuesto", conn);
-            cmd.Parameters.AddWithValue("numero",        p.Numero);
+            cmd.Parameters.AddWithValue("numero",        b.Number);
             cmd.Parameters.AddWithValue("fecha",         DateTime.Today);
-            cmd.Parameters.AddWithValue("estado",        "borrador");
-            cmd.Parameters.AddWithValue("observaciones", (object?)p.Observaciones ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("id_vehiculo",   p.IdVehiculo);
+            cmd.Parameters.AddWithValue("estado",        "draft");
+            cmd.Parameters.AddWithValue("observaciones", (object?)b.Notes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("id_vehiculo",   b.VehicleId);
             return (int)cmd.ExecuteScalar()!;
         }
 
-        public void CreateDetalle(DetallePresupuesto d, NpgsqlConnection conn, NpgsqlTransaction tx)
+        public void CreateDetail(BudgetDetail d, NpgsqlConnection conn, NpgsqlTransaction tx)
         {
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO detalle_presupuesto (id_presupuesto, tipo, descripcion, cantidad, precio_unitario, subtotal)
                 VALUES (@id_presupuesto, @tipo, @descripcion, @cantidad, @precio_unitario, @subtotal)", conn, tx);
-            cmd.Parameters.AddWithValue("id_presupuesto",  d.IdPresupuesto);
-            cmd.Parameters.AddWithValue("tipo",            d.Tipo);
-            cmd.Parameters.AddWithValue("descripcion",     d.Descripcion);
-            cmd.Parameters.AddWithValue("cantidad",        d.Cantidad);
-            cmd.Parameters.AddWithValue("precio_unitario", d.PrecioUnitario);
+            cmd.Parameters.AddWithValue("id_presupuesto",  d.BudgetId);
+            cmd.Parameters.AddWithValue("tipo",            d.Type);
+            cmd.Parameters.AddWithValue("descripcion",     d.Description);
+            cmd.Parameters.AddWithValue("cantidad",        d.Quantity);
+            cmd.Parameters.AddWithValue("precio_unitario", d.UnitPrice);
             cmd.Parameters.AddWithValue("subtotal",        d.Subtotal);
             cmd.ExecuteNonQuery();
         }
 
-        public void CambiarEstado(int id, string estado)
+        public void UpdateStatus(int id, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand(
                 "UPDATE presupuestos SET estado = @estado WHERE id_presupuesto = @id", conn);
-            cmd.Parameters.AddWithValue("estado", estado);
+            cmd.Parameters.AddWithValue("estado", status);
             cmd.Parameters.AddWithValue("id",     id);
             cmd.ExecuteNonQuery();
         }
 
-        public int AprobarConTransaccion(int idPresupuesto, List<DetallePresupuesto> detalles, int idVehiculo)
+        /// <summary>
+        /// Transacción ACID — aprobar presupuesto:
+        /// 1. Crea el service
+        /// 2. Copia detalles como detalle_service
+        /// 3. Actualiza presupuesto a 'approved' y vincula el service
+        /// </summary>
+        public int ApproveWithTransaction(int budgetId, List<BudgetDetail> details, int vehicleId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var tx   = conn.BeginTransaction();
@@ -106,31 +112,31 @@ namespace BoxService_BackEnd.Repositories
                     VALUES (@fecha, 0, 'Desde presupuesto', @id_vehiculo, @id_presupuesto)
                     RETURNING id_service", conn, tx);
                 cmdService.Parameters.AddWithValue("fecha",          DateTime.Today);
-                cmdService.Parameters.AddWithValue("id_vehiculo",    idVehiculo);
-                cmdService.Parameters.AddWithValue("id_presupuesto", idPresupuesto);
-                var idService = (int)cmdService.ExecuteScalar()!;
+                cmdService.Parameters.AddWithValue("id_vehiculo",    vehicleId);
+                cmdService.Parameters.AddWithValue("id_presupuesto", budgetId);
+                var serviceId = (int)cmdService.ExecuteScalar()!;
 
                 // PASO 2 — copiar detalles como detalle_service
-                foreach (var d in detalles)
+                foreach (var d in details)
                 {
                     using var cmdDet = new NpgsqlCommand(@"
                         INSERT INTO detalle_service (id_service, descripcion, realizado)
                         VALUES (@id_service, @descripcion, FALSE)", conn, tx);
-                    cmdDet.Parameters.AddWithValue("id_service",  idService);
-                    cmdDet.Parameters.AddWithValue("descripcion", d.Descripcion);
+                    cmdDet.Parameters.AddWithValue("id_service",  serviceId);
+                    cmdDet.Parameters.AddWithValue("descripcion", d.Description);
                     cmdDet.ExecuteNonQuery();
                 }
 
                 // PASO 3 — actualizar presupuesto
                 using var cmdUpdate = new NpgsqlCommand(@"
-                    UPDATE presupuestos SET estado = 'aprobado', id_service = @id_service
+                    UPDATE presupuestos SET estado = 'approved', id_service = @id_service
                     WHERE id_presupuesto = @id", conn, tx);
-                cmdUpdate.Parameters.AddWithValue("id_service", idService);
-                cmdUpdate.Parameters.AddWithValue("id",         idPresupuesto);
+                cmdUpdate.Parameters.AddWithValue("id_service", serviceId);
+                cmdUpdate.Parameters.AddWithValue("id",         budgetId);
                 cmdUpdate.ExecuteNonQuery();
 
                 tx.Commit();
-                return idService;
+                return serviceId;
             }
             catch
             {
@@ -139,15 +145,15 @@ namespace BoxService_BackEnd.Repositories
             }
         }
 
-        private static Presupuesto MapRow(NpgsqlDataReader r) => new()
+        private static Budget MapRow(NpgsqlDataReader r) => new()
         {
-            IdPresupuesto = (int)r["id_presupuesto"],
-            Numero        = r["numero"].ToString()!,
-            Fecha         = r["fecha"].ToString()!,
-            Estado        = r["estado"].ToString()!,
-            Observaciones = r["observaciones"] as string,
-            IdVehiculo    = (int)r["id_vehiculo"],
-            IdService     = r["id_service"] as int?
+            BudgetId  = (int)r["id_presupuesto"],
+            Number    = r["numero"].ToString()!,
+            Date      = r["fecha"].ToString()!,
+            Status    = r["estado"].ToString()!,
+            Notes     = r["observaciones"] as string,
+            VehicleId = (int)r["id_vehiculo"],
+            ServiceId = r["id_service"] as int?
         };
     }
 }
