@@ -9,11 +9,11 @@ namespace BoxService_BackEnd.Router
 
         public void Route(HttpListenerContext context)
         {
-            var request  = context.Request;
+            var request = context.Request;
             var response = context.Response;
 
             var method = request.HttpMethod.ToUpper();
-            var path   = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
 
             if (method == "GET" && path == "/api/services")
             {
@@ -24,6 +24,16 @@ namespace BoxService_BackEnd.Router
             if (method == "POST" && path == "/api/services")
             {
                 _controller.Create(request, response);
+                return;
+            }
+
+            // Crear detalle para un service
+            // POST /api/services/{id}/detalles
+            if (method == "POST" &&
+                path.StartsWith("/api/services/") &&
+                path.EndsWith("/detalles"))
+            {
+                _controller.CreateDetail(request, response);
                 return;
             }
 
