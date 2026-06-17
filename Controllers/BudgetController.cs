@@ -54,7 +54,6 @@ namespace BoxService_BackEnd.Controllers
             ResponseHelper.Created(response, result!);
         }
 
-        // /api/budgets/5/approve → segment 3 = "5"
         private static int? ParseId(string? path, int segment)
         {
             if (path == null) return null;

@@ -95,10 +95,10 @@ namespace BoxService_BackEnd.Repositories
         }
 
         /// <summary>
-        /// Transacción ACID — aprobar presupuesto:
+        /// Transacción ACID:
         /// 1. Crea el service
         /// 2. Copia detalles como detalle_service
-        /// 3. Actualiza presupuesto a 'approved' y vincula el service
+        /// 3. Actualiza presupuesto a approved y vincula el service
         /// </summary>
         public int ApproveWithTransaction(int budgetId, List<BudgetDetail> details, int vehicleId)
         {
@@ -106,17 +106,15 @@ namespace BoxService_BackEnd.Repositories
             using var tx   = conn.BeginTransaction();
             try
             {
-                // PASO 1 — crear service
                 using var cmdService = new NpgsqlCommand(@"
                     INSERT INTO services (fecha, kilometraje, tipo_service, id_vehiculo, id_presupuesto)
-                    VALUES (@fecha, 0, 'Desde presupuesto', @id_vehiculo, @id_presupuesto)
+                    VALUES (@fecha, 0, 'From budget', @id_vehiculo, @id_presupuesto)
                     RETURNING id_service", conn, tx);
                 cmdService.Parameters.AddWithValue("fecha",          DateTime.Today);
                 cmdService.Parameters.AddWithValue("id_vehiculo",    vehicleId);
                 cmdService.Parameters.AddWithValue("id_presupuesto", budgetId);
                 var serviceId = (int)cmdService.ExecuteScalar()!;
 
-                // PASO 2 — copiar detalles como detalle_service
                 foreach (var d in details)
                 {
                     using var cmdDet = new NpgsqlCommand(@"
@@ -127,7 +125,6 @@ namespace BoxService_BackEnd.Repositories
                     cmdDet.ExecuteNonQuery();
                 }
 
-                // PASO 3 — actualizar presupuesto
                 using var cmdUpdate = new NpgsqlCommand(@"
                     UPDATE presupuestos SET estado = 'approved', id_service = @id_service
                     WHERE id_presupuesto = @id", conn, tx);
