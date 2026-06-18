@@ -4,12 +4,14 @@ using System.Net;
 namespace BoxService_BackEnd.Router
 {
     public class IndexRouter(
+        ClientRouter clients,
         VehicleRouter vehicles,
         BudgetRouter budgets,
         InvoiceRouter invoices,
         ServiceRouter services,
         HealthRouter health)
     {
+        private readonly ClientRouter _clients = clients;
         private readonly VehicleRouter _vehicles = vehicles;
         private readonly BudgetRouter _budgets = budgets;
         private readonly InvoiceRouter _invoices = invoices;
@@ -41,6 +43,12 @@ namespace BoxService_BackEnd.Router
                 if (path.StartsWith("/health"))
                 {
                     _health.Route(context);
+                    return;
+                }
+
+                if (path.StartsWith("/api/clients") || path.StartsWith("/api/clientes"))
+                {
+                    _clients.Route(context);
                     return;
                 }
 
