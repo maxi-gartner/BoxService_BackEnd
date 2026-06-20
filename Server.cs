@@ -21,6 +21,11 @@ namespace BoxService_BackEnd
             _listener = new HttpListener();
             _listener.Prefixes.Add(Prefix);
 
+            var clientRepository = new ClientRepository();
+            var clientService    = new ClientService(clientRepository);
+            var clientController = new ClientController(clientService);
+            var clientRouter     = new ClientRouter(clientController);
+
             // ── VEHICLES ─────────────────────────────
 
             var vehicleRepository = new VehicleRepository();
@@ -38,6 +43,7 @@ namespace BoxService_BackEnd
             // ── MAIN ROUTER ─────────────────────────
 
             _router = new IndexRouter(
+                clientRouter,
                 vehicleRouter,
                 budgetRouter,
                 invoiceRouter,
