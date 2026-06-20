@@ -79,9 +79,9 @@ namespace BoxService_BackEnd.Repositories
             command.Parameters.AddWithValue("fecha", service.Date);
             command.Parameters.AddWithValue("kilometraje", service.Mileage);
             command.Parameters.AddWithValue("tipo_service", service.ServiceType);
-            command.Parameters.AddWithValue("observaciones", service.Notes);
-            command.Parameters.AddWithValue("proximo_km", service.NextMileage);
-            command.Parameters.AddWithValue("proxima_fecha", service.NextDate);
+            command.Parameters.AddWithValue("observaciones", (object?)service.Notes ?? DBNull.Value);
+            command.Parameters.AddWithValue("proximo_km", (object?)service.NextMileage ?? DBNull.Value);
+            command.Parameters.AddWithValue("proxima_fecha", (object?)service.NextDate ?? DBNull.Value);
             command.Parameters.AddWithValue("id_vehiculo", service.VehicleId);
 
             service.ServiceId = Convert.ToInt32(command.ExecuteScalar());
@@ -123,11 +123,19 @@ namespace BoxService_BackEnd.Repositories
             Date = r.GetDateTime(r.GetOrdinal("fecha")),
             Mileage = r.GetInt32(r.GetOrdinal("kilometraje")),
             ServiceType = r.GetString(r.GetOrdinal("tipo_service")),
+
             Notes = r.IsDBNull(r.GetOrdinal("observaciones"))
                 ? string.Empty
                 : r.GetString(r.GetOrdinal("observaciones")),
-            NextMileage = r.GetInt32(r.GetOrdinal("proximo_km")),
-            NextDate = r.GetDateTime(r.GetOrdinal("proxima_fecha")),
+
+            NextMileage = r.IsDBNull(r.GetOrdinal("proximo_km"))
+                ? null
+                : r.GetInt32(r.GetOrdinal("proximo_km")),
+
+            NextDate = r.IsDBNull(r.GetOrdinal("proxima_fecha"))
+                ? null
+                : r.GetDateTime(r.GetOrdinal("proxima_fecha")),
+
             VehicleId = r.GetInt32(r.GetOrdinal("id_vehiculo"))
         };
     }

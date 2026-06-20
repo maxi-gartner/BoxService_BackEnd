@@ -1,3 +1,5 @@
+using System;
+
 namespace BoxService_BackEnd.Models
 {
     // ROL D — Oscar
@@ -8,8 +10,10 @@ namespace BoxService_BackEnd.Models
         public int Mileage { get; set; }
         public string ServiceType { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
-        public int NextMileage { get; set; }
-        public DateTime NextDate { get; set; }
+
+        public int? NextMileage { get; set; }
+        public DateTime? NextDate { get; set; }
+
         public int VehicleId { get; set; }
     }
 

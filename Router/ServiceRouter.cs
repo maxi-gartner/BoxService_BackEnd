@@ -28,10 +28,10 @@ namespace BoxService_BackEnd.Router
             }
 
             // Crear detalle para un service
-            // POST /api/services/{id}/detalles
+            // POST /api/services/{id}/details
             if (method == "POST" &&
                 path.StartsWith("/api/services/") &&
-                path.EndsWith("/detalles"))
+                path.EndsWith("/details"))
             {
                 _controller.CreateDetail(request, response);
                 return;
