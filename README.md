@@ -19,7 +19,7 @@ Sistema de gestión para lubricentros y talleres mecánicos
 
 Este repositorio contiene el servidor backend de **BoxService**, un sistema de gestión para lubricentros y centros de service vehicular.
 
-El backend expone una API HTTP que recibe requests del frontend, ejecuta la lógica de negocio y persiste los datos en PostgreSQL. Toda la comunicación se hace mediante JSON siguiendo el patrón envelope:
+Es un backend puro, sin interfaz gráfica ni ASP.NET MVC: expone una API HTTP que recibe requests del frontend, ejecuta la lógica de negocio y persiste los datos en PostgreSQL. Toda la comunicación se hace mediante JSON siguiendo el patrón envelope:
 
 ```json
 { "success": true,  "data": {},   "error": null }
@@ -65,12 +65,12 @@ BoxService-BackEnd/
 ├── Services/           ← lógica de negocio y validaciones
 ├── Repositories/       ← único punto de acceso a la base de datos
 ├── Models/             ← clases que representan las entidades
+├── Router/             ← decide qué controlador atiende cada ruta
 ├── Database/
-│   └── migrations/     ← scripts SQL numerados para crear las tablas
-├── Server.cs           ← inicia el HttpListener en localhost:5000
-├── Router.cs           ← enruta cada request al controller correcto
+│   └── migrations/     ← scripts SQL para crear y modificar tablas
+├── Server.cs           ← inicia el HttpListener en localhost:5001
 ├── ResponseHelper.cs   ← helpers para respuestas JSON estandarizadas
-├── Program.cs          ← entry point
+├── Program.cs          ← punto de entrada
 └── BoxService-BackEnd.csproj
 ```
 
@@ -130,7 +130,7 @@ Abrir cada archivo en `Database/migrations/` y ejecutarlos en este orden:
 Presionar **F5** en Visual Studio. El servidor levanta en:
 
 ```
-http://localhost:5000
+http://localhost:5001
 ```
 
 ### 6. Verificar que funciona
