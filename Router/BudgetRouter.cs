@@ -9,11 +9,11 @@ namespace BoxService_BackEnd.Router
 
         public void Route(HttpListenerContext context)
         {
-            var request  = context.Request;
+            var request = context.Request;
             var response = context.Response;
 
             var method = request.HttpMethod.ToUpper();
-            var path   = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
 
             if (method == "GET" && path == "/api/budgets")
             {
@@ -24,6 +24,17 @@ namespace BoxService_BackEnd.Router
             if (method == "POST" && path == "/api/budgets")
             {
                 _controller.Create(request, response);
+                return;
+            }
+
+            // NUEVO:
+            // Vincula un presupuesto con el service creado desde el módulo de Services.
+            // PUT /api/budgets/{id}/service
+            if (method == "PUT" &&
+                path.StartsWith("/api/budgets/") &&
+                path.EndsWith("/service"))
+            {
+                _controller.AssignService(request, response);
                 return;
             }
 

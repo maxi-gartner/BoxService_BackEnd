@@ -24,24 +24,38 @@ namespace BoxService_BackEnd.Services
         {
             if (request.ClientId <= 0)
                 throw new ArgumentException("client_id is required and must be greater than 0.");
+
             if (string.IsNullOrWhiteSpace(request.Brand))
                 throw new ArgumentException("Brand is required.");
+
             if (string.IsNullOrWhiteSpace(request.Model))
                 throw new ArgumentException("Model is required.");
+
             if (string.IsNullOrWhiteSpace(request.Plate))
                 throw new ArgumentException("Plate is required.");
 
+            // NUEVO:
+            // Validamos que el kilometraje actual no sea negativo.
+            if (request.CurrentMileage < 0)
+                throw new ArgumentException("Current mileage cannot be negative.");
+
             var existing = _repository.GetByPlate(request.Plate);
+
             if (existing != null)
                 throw new InvalidOperationException("A vehicle with that plate already exists.");
 
             var vehicle = new Vehicle
             {
                 ClientId = request.ClientId,
-                Brand    = request.Brand.Trim(),
-                Model    = request.Model.Trim(),
-                Year     = request.Year,
-                Plate    = request.Plate.Trim().ToUpperInvariant()
+                Brand = request.Brand.Trim(),
+                Model = request.Model.Trim(),
+                Year = request.Year,
+                Plate = request.Plate.Trim().ToUpperInvariant(),
+
+                // NUEVO:
+                // Esto viene desde el front como currentMileage
+                // y después VehicleRepository lo guarda en kilometraje_actual.
+                CurrentMileage = request.CurrentMileage
             };
 
             return _repository.Create(vehicle);
