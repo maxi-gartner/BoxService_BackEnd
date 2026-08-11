@@ -66,6 +66,7 @@ namespace BoxService_BackEnd
             var budgetRouter = new BudgetRouter();
             var invoiceRouter = new InvoiceRouter();
             var serviceRouter = new ServiceRouter();
+            var catalogRouter = new CatalogRouter();
             var healthRouter = new HealthRouter();
 
             // ── MAIN ROUTER ─────────────────────────
@@ -78,6 +79,7 @@ namespace BoxService_BackEnd
                 budgetRouter,
                 invoiceRouter,
                 serviceRouter,
+                catalogRouter,
                 healthRouter
             );
         }
