@@ -1,6 +1,8 @@
+using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Services;
 
 namespace BoxService_BackEnd.Controllers
@@ -8,6 +10,11 @@ namespace BoxService_BackEnd.Controllers
     public class BudgetController
     {
         private readonly BudgetService _service = new();
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
 
         public void GetAll(HttpListenerResponse response)
         {
@@ -38,9 +45,26 @@ namespace BoxService_BackEnd.Controllers
 
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var body = new StreamReader(request.InputStream).ReadToEnd();
+            var body = ReadBody(request);
 
-            var (ok, error, result) = _service.Create(body);
+            BudgetCreateRequest? req;
+            try
+            {
+                req = JsonSerializer.Deserialize<BudgetCreateRequest>(body, JsonOptions);
+            }
+            catch
+            {
+                ResponseHelper.BadRequest(response, "Invalid JSON body.");
+                return;
+            }
+
+            if (req == null)
+            {
+                ResponseHelper.BadRequest(response, "Invalid JSON body.");
+                return;
+            }
+
+            var (ok, _, error, result) = _service.Create(req);
 
             if (!ok)
             {
@@ -51,6 +75,8 @@ namespace BoxService_BackEnd.Controllers
             ResponseHelper.Created(response, result!);
         }
 
+        // Reemplaza a los antiguos PUT /{id}/status y POST /{id}/approve.
+        // Un solo endpoint orientado al recurso: PATCH /api/budgets/{id}.
         public void UpdateStatus(HttpListenerRequest request, HttpListenerResponse response)
         {
             var id = ParseId(request.Url?.AbsolutePath, 3);
@@ -61,46 +87,38 @@ namespace BoxService_BackEnd.Controllers
                 return;
             }
 
-            var body = new StreamReader(request.InputStream).ReadToEnd();
+            var body = ReadBody(request);
 
-            var (ok, error) = _service.UpdateStatus(id.Value, body);
+            BudgetStatusRequest? req;
+            try
+            {
+                req = JsonSerializer.Deserialize<BudgetStatusRequest>(body, JsonOptions);
+            }
+            catch
+            {
+                ResponseHelper.BadRequest(response, "Invalid JSON body.");
+                return;
+            }
+
+            if (req == null)
+            {
+                ResponseHelper.BadRequest(response, "Invalid JSON body.");
+                return;
+            }
+
+            var (ok, notFound, error, result) = _service.UpdateStatus(id.Value, req);
 
             if (!ok)
             {
-                ResponseHelper.BadRequest(response, error);
+                if (notFound) ResponseHelper.NotFound(response, error);
+                else ResponseHelper.BadRequest(response, error);
                 return;
             }
 
-            ResponseHelper.Ok(response, new { message = "Status updated" });
+            ResponseHelper.Ok(response, result!);
         }
 
-        public void Approve(HttpListenerRequest request, HttpListenerResponse response)
-        {
-            var id = ParseId(request.Url?.AbsolutePath, 3);
-
-            if (id == null)
-            {
-                ResponseHelper.BadRequest(response, "Invalid ID");
-                return;
-            }
-
-            var (ok, error, result) = _service.Approve(id.Value);
-
-            if (!ok)
-            {
-                ResponseHelper.BadRequest(response, error);
-                return;
-            }
-
-            // CAMBIO:
-            // Ahora aprobar un presupuesto NO crea un service.
-            // Devuelve el presupuesto aprobado o el id del presupuesto, según lo maneje BudgetService.
-            ResponseHelper.Created(response, result!);
-        }
-
-        // NUEVO:
         // Recibe el id_service creado desde Services y lo guarda en presupuestos.id_service.
-        // Endpoint esperado:
         // PUT /api/budgets/{budgetId}/service
         public void AssignService(HttpListenerRequest request, HttpListenerResponse response)
         {
@@ -112,12 +130,18 @@ namespace BoxService_BackEnd.Controllers
                 return;
             }
 
-            var body = new StreamReader(request.InputStream).ReadToEnd();
+            var body = ReadBody(request);
 
-            var data = JsonSerializer.Deserialize<AssignServiceRequest>(
-                body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
+            AssignServiceRequest? data;
+            try
+            {
+                data = JsonSerializer.Deserialize<AssignServiceRequest>(body, JsonOptions);
+            }
+            catch
+            {
+                ResponseHelper.BadRequest(response, "Invalid JSON body.");
+                return;
+            }
 
             if (data == null || data.ServiceId <= 0)
             {
@@ -125,15 +149,22 @@ namespace BoxService_BackEnd.Controllers
                 return;
             }
 
-            var (ok, error) = _service.AssignService(id.Value, data.ServiceId);
+            var (ok, notFound, error) = _service.AssignService(id.Value, data.ServiceId);
 
             if (!ok)
             {
-                ResponseHelper.BadRequest(response, error);
+                if (notFound) ResponseHelper.NotFound(response, error);
+                else ResponseHelper.BadRequest(response, error);
                 return;
             }
 
             ResponseHelper.Ok(response, new { message = "Budget linked to service" });
+        }
+
+        private static string ReadBody(HttpListenerRequest request)
+        {
+            using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? System.Text.Encoding.UTF8);
+            return reader.ReadToEnd();
         }
 
         private static int? ParseId(string? path, int segment)
@@ -149,13 +180,6 @@ namespace BoxService_BackEnd.Controllers
             }
 
             return null;
-        }
-
-        // NUEVO:
-        // Modelo interno para leer el body del PUT /api/budgets/{id}/service.
-        private class AssignServiceRequest
-        {
-            public int ServiceId { get; set; }
         }
     }
 }

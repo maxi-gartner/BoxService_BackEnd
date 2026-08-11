@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using BoxService_BackEnd.Database;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
@@ -29,170 +28,147 @@ namespace BoxService_BackEnd.Services
             };
         }
 
-        public (bool ok, string error, Budget? result) Create(string body)
+        public (bool ok, bool notFound, string error, Budget? result) Create(BudgetCreateRequest req)
         {
+            if (req.VehicleId <= 0)
+                return (false, false, "vehicleId is required", null);
+
+            if (req.Details == null || req.Details.Count == 0)
+                return (false, false, "details is required and must have at least one item", null);
+
+            foreach (var d in req.Details)
+            {
+                if (string.IsNullOrWhiteSpace(d.Type))
+                    return (false, false, "Each detail requires a type", null);
+
+                if (string.IsNullOrWhiteSpace(d.Description))
+                    return (false, false, "Each detail requires a description", null);
+            }
+
             try
             {
-                var doc = JsonDocument.Parse(body).RootElement;
-
-                if (!doc.TryGetProperty("vehicle_id", out var vProp))
-                {
-                    return (false, "vehicle_id is required", null);
-                }
-
-                var details = new List<BudgetDetail>();
-
-                if (doc.TryGetProperty("details", out var detailsProp))
-                {
-                    foreach (var item in detailsProp.EnumerateArray())
-                    {
-                        var qty = item.GetProperty("quantity").GetDecimal();
-                        var price = item.GetProperty("unit_price").GetDecimal();
-
-                        details.Add(new BudgetDetail
-                        {
-                            Type = item.GetProperty("type").GetString() ?? "",
-                            Description = item.GetProperty("description").GetString() ?? "",
-                            Quantity = qty,
-                            UnitPrice = price,
-                            Subtotal = qty * price
-                        });
-                    }
-                }
-
-                var lastNumber = _repo.GetLastNumber();
-                var nro = int.Parse(lastNumber.Split('-')[1]) + 1;
+                var nro = _repo.GetNextNumber();
                 var number = $"P-{nro:D4}";
 
                 var budget = new Budget
                 {
-                    Number = number,
-                    VehicleId = vProp.GetInt32(),
-                    Notes = doc.TryGetProperty("notes", out var notes)
-                        ? notes.GetString()
-                        : null
+                    Number    = number,
+                    VehicleId = req.VehicleId,
+                    Notes     = req.Notes
                 };
 
                 var id = _repo.Create(budget);
                 budget.BudgetId = id;
+                budget.Date = DateTime.Today.ToString("yyyy-MM-dd");
 
                 using var conn = DatabaseConnection.GetConnection();
                 using var tx = conn.BeginTransaction();
 
-                foreach (var d in details)
+                foreach (var d in req.Details)
                 {
-                    d.BudgetId = id;
-                    _repo.CreateDetail(d, conn, tx);
+                    var detail = new BudgetDetail
+                    {
+                        BudgetId    = id,
+                        Type        = d.Type,
+                        Description = d.Description,
+                        Quantity    = d.Quantity,
+                        UnitPrice   = d.UnitPrice,
+                        Subtotal    = d.Quantity * d.UnitPrice
+                    };
+
+                    _repo.CreateDetail(detail, conn, tx);
                 }
 
                 tx.Commit();
 
-                return (true, "", budget);
+                return (true, false, "", budget);
             }
             catch (Exception ex)
             {
-                return (false, ex.Message, null);
+                Console.WriteLine($"Error creating budget: {ex}");
+                return (false, false, "Could not create the budget.", null);
             }
         }
 
-        public (bool ok, string error) UpdateStatus(int id, string body)
+        // Unifica lo que antes eran dos endpoints (PUT /status y POST /approve)
+        // en una sola transiciÃ³n de estado: sent | rejected | approved.
+        public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, BudgetStatusRequest req)
         {
             var budget = _repo.GetById(id);
 
             if (budget == null)
             {
-                return (false, "Budget not found");
+                return (false, true, "Budget not found", null);
             }
 
-            var doc = JsonDocument.Parse(body).RootElement;
-            var status = doc.GetProperty("status").GetString() ?? "";
+            var valid = new[] { "sent", "rejected", "approved" };
 
-            var valid = new[] { "sent", "rejected" };
-
-            if (!Array.Exists(valid, s => s == status))
+            if (!Array.Exists(valid, s => s == req.Status))
             {
-                return (false, "Invalid status. Use: sent | rejected");
+                return (false, false, "Invalid status. Use: sent | rejected | approved", null);
             }
 
-            _repo.UpdateStatus(id, status);
+            if (req.Status == "approved")
+            {
+                if (budget.Status == "approved")
+                    return (false, false, "Budget already approved", null);
 
-            return (true, "");
+                if (budget.Status == "rejected")
+                    return (false, false, "Cannot approve a rejected budget", null);
+
+                try
+                {
+                    var approvedId = _repo.ApproveWithTransaction(id, _repo.GetDetails(id), budget.VehicleId);
+
+                    return (true, false, "", new
+                    {
+                        budgetId = approvedId,
+                        status = "approved",
+                        message = "Budget approved. Service must be created from Services module."
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error approving budget {id}: {ex}");
+                    return (false, false, "Could not approve the budget.", null);
+                }
+            }
+
+            _repo.UpdateStatus(id, req.Status);
+
+            return (true, false, "", new { budgetId = id, status = req.Status });
         }
 
-        public (bool ok, string error, object? result) Approve(int id)
-        {
-            var budget = _repo.GetById(id);
-
-            if (budget == null)
-            {
-                return (false, "Budget not found", null);
-            }
-
-            if (budget.Status == "approved")
-            {
-                return (false, "Budget already approved", null);
-            }
-
-            if (budget.Status == "rejected")
-            {
-                return (false, "Cannot approve a rejected budget", null);
-            }
-
-            // CAMBIO:
-            // Antes este método creaba automáticamente un service.
-            // Ahora solo aprueba el presupuesto.
-            // El service lo crea después el módulo de Services.
-            var budgetIdApproved = _repo.ApproveWithTransaction(
-                id,
-                _repo.GetDetails(id),
-                budget.VehicleId
-            );
-
-            return (true, "", new
-            {
-                budget_id = budgetIdApproved,
-                status = "approved",
-
-                // CAMBIO:
-                // Ya no se devuelve service_id_created porque aprobar un presupuesto
-                // no tiene que crear un service automáticamente.
-                service_id_created = (int?)null,
-
-                message = "Budget approved. Service must be created from Services module."
-            });
-        }
-
-        // NUEVO:
-        // Vincula un presupuesto aprobado con el service creado desde el módulo de Services.
+        // Vincula un presupuesto aprobado con el service creado desde el mÃ³dulo de Services.
         // Esto actualiza presupuestos.id_service.
-        public (bool ok, string error) AssignService(int budgetId, int serviceId)
+        public (bool ok, bool notFound, string error) AssignService(int budgetId, int serviceId)
         {
+            var budget = _repo.GetById(budgetId);
+
+            if (budget == null)
+            {
+                return (false, true, "Budget not found");
+            }
+
+            if (budget.Status != "approved")
+            {
+                return (false, false, "Only approved budgets can be linked to a service");
+            }
+
+            if (budget.ServiceId != null)
+            {
+                return (false, false, "Budget already has a linked service");
+            }
+
             try
             {
-                var budget = _repo.GetById(budgetId);
-
-                if (budget == null)
-                {
-                    return (false, "Budget not found");
-                }
-
-                if (budget.Status != "approved")
-                {
-                    return (false, "Only approved budgets can be linked to a service");
-                }
-
-                if (budget.ServiceId != null)
-                {
-                    return (false, "Budget already has a linked service");
-                }
-
                 _repo.AssignService(budgetId, serviceId);
-
-                return (true, "");
+                return (true, false, "");
             }
             catch (Exception ex)
             {
-                return (false, ex.Message);
+                Console.WriteLine($"Error assigning service to budget {budgetId}: {ex}");
+                return (false, false, "Could not link the service to the budget.");
             }
         }
     }

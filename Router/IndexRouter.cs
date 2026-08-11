@@ -62,7 +62,7 @@ namespace BoxService_BackEnd.Router
 
                 // ── BUDGETS ──────────────────────────
 
-                if (path.StartsWith("/api/budgets"))
+                if (path.StartsWith("/api/budgets") || path.StartsWith("/api/presupuestos"))
                 {
                     _budgets.Route(context);
                     return;
@@ -70,7 +70,7 @@ namespace BoxService_BackEnd.Router
 
                 // ── INVOICES ─────────────────────────
 
-                if (path.StartsWith("/api/invoices"))
+                if (path.StartsWith("/api/invoices") || path.StartsWith("/api/facturas"))
                 {
                     _invoices.Route(context);
                     return;

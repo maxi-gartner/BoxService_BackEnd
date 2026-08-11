@@ -23,8 +23,15 @@ namespace BoxService_BackEnd
         // El frontend llama a esta URL desde api.js.
         private const string Prefix = "http://localhost:5001/";
 
-        public Server()
+        // API key simple compartida con el frontend (header X-Api-Key).
+        // No es un sistema de auth completo — es un candado mínimo para que
+        // la API no quede totalmente abierta a cualquiera.
+        private readonly string _apiKey;
+
+        public Server(string apiKey)
         {
+            _apiKey = apiKey;
+
             // Se crea el listener HTTP.
             _listener = new HttpListener();
 
@@ -44,10 +51,12 @@ namespace BoxService_BackEnd
             // ── VEHICLES ─────────────────────────────
             // Acá se arma la cadena del módulo vehículos:
             // Repository → Service → Controller → Router
+            // GetHistory necesita ServicesService para traer el historial real
+            // de services de un vehículo.
 
             var vehicleRepository = new VehicleRepository();
             var vehicleService = new VehicleService(vehicleRepository);
-            var vehicleController = new VehicleController(vehicleService);
+            var vehicleController = new VehicleController(vehicleService, new ServicesService());
             var vehicleRouter = new VehicleRouter(vehicleController);
 
             // ── OTHER ROUTERS ───────────────────────
@@ -126,8 +135,8 @@ namespace BoxService_BackEnd
                 // que corre en localhost:5001.
 
                 response.Headers.Add("Access-Control-Allow-Origin", "*");
-                response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-                response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+                response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key");
 
                 // El navegador a veces manda una petición OPTIONS antes de una real.
                 // Es como una pregunta previa:
@@ -145,6 +154,22 @@ namespace BoxService_BackEnd
                 // [GET] /api/services
                 // [POST] /api/services
                 Console.WriteLine($"[{request.HttpMethod}] {request.Url?.AbsolutePath}");
+
+                // ── API KEY ──────────────────────────
+                // Todo lo que no sea la raíz o /health necesita el header X-Api-Key.
+                var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+                var isPublicRoute = path == "" || path.StartsWith("/health");
+
+                if (!isPublicRoute)
+                {
+                    var providedKey = request.Headers["X-Api-Key"];
+
+                    if (string.IsNullOrEmpty(providedKey) || providedKey != _apiKey)
+                    {
+                        ResponseHelper.Unauthorized(response, "Missing or invalid API key.");
+                        return;
+                    }
+                }
 
                 // Manda la petición al router principal.
                 // A partir de acá, IndexRouter decide a qué router específico va.

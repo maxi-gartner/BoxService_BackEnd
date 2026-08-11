@@ -9,7 +9,7 @@ namespace BoxService_BackEnd.Controllers
 {
     public class ServicesController
     {
-        // El Controller usa el Service para aplicar lógica de negocio.
+        // El Controller usa el Service para aplicar lï¿½gica de negocio.
         // El Controller NO guarda en base directo.
         private readonly ServicesService _service = new();
 
@@ -18,7 +18,7 @@ namespace BoxService_BackEnd.Controllers
         public void GetAll(HttpListenerResponse response)
         {
             // Llama a la capa Services.
-            // ServicesService después llama al Repository.
+            // ServicesService despuï¿½s llama al Repository.
             var services = _service.GetAll();
 
             // Devuelve respuesta OK con la lista de services.
@@ -26,7 +26,7 @@ namespace BoxService_BackEnd.Controllers
         }
 
         // GET /api/services/{id}
-        // Trae un service específico por ID.
+        // Trae un service especï¿½fico por ID.
         public void GetById(HttpListenerRequest request, HttpListenerResponse response)
         {
             // Obtiene la ruta de la URL.
@@ -42,24 +42,24 @@ namespace BoxService_BackEnd.Controllers
             // parts[3] = "5"
             var parts = path.Split('/');
 
-            // Controla que exista el ID y que sea un número válido.
+            // Controla que exista el ID y que sea un nï¿½mero vï¿½lido.
             if (parts.Length < 4 || !int.TryParse(parts[3], out int id))
             {
                 ResponseHelper.BadRequest(response, "Invalid service ID");
                 return;
             }
 
-            // Si el ID está bien, se lo pasa al Service.
+            // Si el ID estï¿½ bien, se lo pasa al Service.
             var service = _service.GetById(id);
 
-            // Si no encontró el service, devuelve 404.
+            // Si no encontrï¿½ el service, devuelve 404.
             if (service == null)
             {
                 ResponseHelper.NotFound(response, "Service not found");
                 return;
             }
 
-            // Si lo encontró, devuelve OK con el service.
+            // Si lo encontrï¿½, devuelve OK con el service.
             ResponseHelper.Ok(response, service);
         }
 
@@ -67,7 +67,7 @@ namespace BoxService_BackEnd.Controllers
         // Crea un nuevo service.
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
         {
-            // Lee el body que llegó en la petición.
+            // Lee el body que llegï¿½ en la peticiï¿½n.
             // En un POST, los datos vienen como JSON en el body.
             using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
             var body = reader.ReadToEnd();
@@ -79,7 +79,7 @@ namespace BoxService_BackEnd.Controllers
             {
                 // Convierte el JSON recibido en un objeto C#.
                 // PropertyNameCaseInsensitive permite leer propiedades aunque vengan
-                // con mayúsculas o minúsculas distintas.
+                // con mayï¿½sculas o minï¿½sculas distintas.
                 req = JsonSerializer.Deserialize<ServiceCreateRequest>(body, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -87,12 +87,12 @@ namespace BoxService_BackEnd.Controllers
             }
             catch
             {
-                // Si el JSON está mal escrito o no se puede convertir, devuelve error.
+                // Si el JSON estï¿½ mal escrito o no se puede convertir, devuelve error.
                 ResponseHelper.BadRequest(response, "Invalid JSON");
                 return;
             }
 
-            // Si el JSON no trajo datos válidos, devuelve error.
+            // Si el JSON no trajo datos vï¿½lidos, devuelve error.
             if (req == null)
             {
                 ResponseHelper.BadRequest(response, "Invalid service data");
@@ -100,8 +100,8 @@ namespace BoxService_BackEnd.Controllers
             }
 
             // Arma el modelo Service con los datos recibidos.
-            // Todavía no se calcula NextMileage ni NextDate acá.
-            // Eso lo hace ServicesService porque es lógica de negocio.
+            // Todavï¿½a no se calcula NextMileage ni NextDate acï¿½.
+            // Eso lo hace ServicesService porque es lï¿½gica de negocio.
             var service = new Service
             {
                 Date = req.Date,
@@ -114,18 +114,23 @@ namespace BoxService_BackEnd.Controllers
             try
             {
                 // Manda el service a la capa Services.
-                // Ahí se sanitiza, valida, calcula próximo KM / próxima fecha
+                // Ahï¿½ se sanitiza, valida, calcula prï¿½ximo KM / prï¿½xima fecha
                 // y luego se guarda usando el Repository.
                 var created = _service.Create(service);
 
                 // Devuelve 201 Created con el service creado.
                 ResponseHelper.Created(response, created);
             }
+            catch (ArgumentException ex)
+            {
+                // Error de validaciï¿½n de negocio -> 400.
+                ResponseHelper.BadRequest(response, ex.Message);
+            }
             catch (Exception ex)
             {
-                // Si ServicesService tira un error de validación,
-                // se devuelve como BadRequest.
-                ResponseHelper.BadRequest(response, ex.Message);
+                // Cualquier otra falla (ej. base de datos) -> 500, sin exponer el detalle interno.
+                Console.WriteLine($"Error creating service: {ex}");
+                ResponseHelper.InternalError(response);
             }
         }
 
@@ -148,7 +153,7 @@ namespace BoxService_BackEnd.Controllers
             var parts = path.Split('/');
 
             // Esperado: /api/services/{id}/details
-            // Controla que exista el ID del service y que sea numérico.
+            // Controla que exista el ID del service y que sea numï¿½rico.
             if (parts.Length < 5 || !int.TryParse(parts[3], out int serviceId))
             {
                 ResponseHelper.BadRequest(response, "Invalid service ID");
@@ -178,7 +183,7 @@ namespace BoxService_BackEnd.Controllers
                 return;
             }
 
-            // Si no se pudo obtener un detalle válido, devuelve error.
+            // Si no se pudo obtener un detalle vï¿½lido, devuelve error.
             if (detail == null)
             {
                 ResponseHelper.BadRequest(response, "Invalid service detail data");
@@ -186,23 +191,27 @@ namespace BoxService_BackEnd.Controllers
             }
 
             // Asocia el detalle con el service de la URL.
-            // El frontend manda la descripción, pero el ID del service sale de la URL.
+            // El frontend manda la descripciï¿½n, pero el ID del service sale de la URL.
             detail.ServiceId = serviceId;
 
             try
             {
                 // Manda el detalle a ServicesService.
-                // Ahí se sanitiza, valida y luego se guarda en detalle_service.
+                // Ahï¿½ se sanitiza, valida y luego se guarda en detalle_service.
                 var created = _service.CreateDetail(detail);
 
                 // Devuelve 201 Created con el detalle creado.
                 ResponseHelper.Created(response, created);
             }
+            catch (ArgumentException ex)
+            {
+                // Error de validaciï¿½n de negocio -> 400.
+                ResponseHelper.BadRequest(response, ex.Message);
+            }
             catch (Exception ex)
             {
-                // Si falla una validación en ServicesService,
-                // se devuelve error al cliente.
-                ResponseHelper.BadRequest(response, ex.Message);
+                Console.WriteLine($"Error creating service detail: {ex}");
+                ResponseHelper.InternalError(response);
             }
         }
     }

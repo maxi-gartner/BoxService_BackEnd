@@ -53,11 +53,18 @@ namespace BoxService_BackEnd.Router
             id = 0;
 
             var prefix = basePath + "/";
-            if (!path.StartsWith(prefix) || !path.EndsWith("/vehicles"))
+            if (!path.StartsWith(prefix))
                 return false;
 
+            // Acepta tanto el sufijo en inglés como en español, para que
+            // /api/clients/{id}/vehicles y /api/clientes/{id}/vehiculos funcionen igual.
+            string suffix;
+            if (path.EndsWith("/vehicles")) suffix = "/vehicles";
+            else if (path.EndsWith("/vehiculos")) suffix = "/vehiculos";
+            else return false;
+
             var segment = path.Substring(prefix.Length);
-            segment = segment.Substring(0, segment.Length - "/vehicles".Length).Trim('/');
+            segment = segment.Substring(0, segment.Length - suffix.Length).Trim('/');
 
             return int.TryParse(segment, out id);
         }

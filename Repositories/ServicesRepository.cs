@@ -49,6 +49,32 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapService(reader) : null;
         }
 
+        public List<Service> GetByVehicleId(int vehicleId)
+        {
+            var services = new List<Service>();
+
+            using var connection = DatabaseConnection.GetConnection();
+
+            const string sql = @"
+                SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
+                       proximo_km, proxima_fecha, id_vehiculo
+                FROM services
+                WHERE id_vehiculo = @id_vehiculo
+                ORDER BY fecha DESC;";
+
+            using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("id_vehiculo", vehicleId);
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                services.Add(MapService(reader));
+            }
+
+            return services;
+        }
+
         public Service Create(Service service)
         {
             using var connection = DatabaseConnection.GetConnection();

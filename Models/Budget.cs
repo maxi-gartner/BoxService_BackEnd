@@ -29,4 +29,30 @@ namespace BoxService_BackEnd.Models
         public List<BudgetDetail> Details { get; set; } = new();
         public decimal            Total   => Details.Sum(d => d.Subtotal);
     }
+
+    // DTOs de request — camelCase, igual que el resto de la API (Clientes/Vehículos/Services).
+    public class BudgetDetailRequest
+    {
+        public string  Type        { get; set; } = "";
+        public string  Description { get; set; } = "";
+        public decimal Quantity    { get; set; }
+        public decimal UnitPrice   { get; set; }
+    }
+
+    public class BudgetCreateRequest
+    {
+        public int    VehicleId { get; set; }
+        public string? Notes    { get; set; }
+        public List<BudgetDetailRequest> Details { get; set; } = new();
+    }
+
+    public class BudgetStatusRequest
+    {
+        public string Status { get; set; } = "";
+    }
+
+    public class AssignServiceRequest
+    {
+        public int ServiceId { get; set; }
+    }
 }

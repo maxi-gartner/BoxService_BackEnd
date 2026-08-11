@@ -94,6 +94,20 @@ namespace BoxService_BackEnd
                 }
             });
 
+        // Respuesta 401 Unauthorized.
+        // Se usa cuando falta el header X-Api-Key o no coincide con el configurado.
+        public static void Unauthorized(HttpListenerResponse response, string message)
+            => Send(response, 401, new
+            {
+                success = false,
+                data = (object?)null,
+                error = new
+                {
+                    code = 401,
+                    message
+                }
+            });
+
         // Respuesta 404 Not Found.
         // Se usa cuando no se encontró la ruta o el recurso.
         // Ejemplo: service no encontrado.
