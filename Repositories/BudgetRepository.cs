@@ -233,9 +233,12 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
 
+            // El presupuesto pasa a "completed" acá: es el momento en el que el
+            // trabajo efectivamente se hizo (se generó el service), no cuando
+            // se aprobó. "approved" pasa a significar "esperando que se haga".
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
-                SET id_service = @id_service
+                SET id_service = @id_service, estado = 'completed'
                 WHERE id_presupuesto = @id_presupuesto", conn);
 
             cmd.Parameters.AddWithValue("id_service", serviceId);

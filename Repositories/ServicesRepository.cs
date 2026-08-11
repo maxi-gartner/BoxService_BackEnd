@@ -115,6 +115,37 @@ namespace BoxService_BackEnd.Repositories
             return service;
         }
 
+        public List<ServiceDetail> GetDetailsByServiceId(int serviceId)
+        {
+            var detalles = new List<ServiceDetail>();
+
+            using var connection = DatabaseConnection.GetConnection();
+
+            const string sql = @"
+                SELECT id_detalle, id_service, descripcion, realizado
+                FROM detalle_service
+                WHERE id_service = @id_service
+                ORDER BY id_detalle;";
+
+            using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("id_service", serviceId);
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                detalles.Add(new ServiceDetail
+                {
+                    DetailId  = reader.GetInt32(reader.GetOrdinal("id_detalle")),
+                    ServiceId = reader.GetInt32(reader.GetOrdinal("id_service")),
+                    Description = reader.GetString(reader.GetOrdinal("descripcion")),
+                    Done = reader.GetBoolean(reader.GetOrdinal("realizado"))
+                });
+            }
+
+            return detalles;
+        }
+
         public ServiceDetail CreateDetail(ServiceDetail detail)
         {
             using var connection = DatabaseConnection.GetConnection();

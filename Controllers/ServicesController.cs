@@ -134,6 +134,14 @@ namespace BoxService_BackEnd.Controllers
             }
         }
 
+        // GET /api/services/{id}/details
+        // Trae el detalle de trabajo cargado para un service (para el ticket imprimible).
+        public void GetDetails(HttpListenerResponse response, int serviceId)
+        {
+            var detalles = _service.GetDetails(serviceId);
+            ResponseHelper.Ok(response, detalles);
+        }
+
         // POST /api/services/{id}/details
         // Crea un detalle para un service existente.
         public void CreateDetail(HttpListenerRequest request, HttpListenerResponse response)

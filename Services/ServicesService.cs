@@ -35,6 +35,14 @@ namespace BoxService_BackEnd.Services
             return _repository.GetByVehicleId(vehicleId);
         }
 
+        // GET /api/services/{id}/details
+        public List<ServiceDetail> GetDetails(int serviceId)
+        {
+            if (serviceId <= 0) return new List<ServiceDetail>();
+
+            return _repository.GetDetailsByServiceId(serviceId);
+        }
+
         // POST /api/services
         // Crea un service nuevo.
         public Service Create(Service service)
