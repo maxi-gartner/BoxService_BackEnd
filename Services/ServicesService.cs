@@ -19,11 +19,28 @@ namespace BoxService_BackEnd.Services
         // Trae un service puntual por ID.
         public Service? GetById(int id)
         {
-            // Validación básica: un ID 0 o negativo no sirve.
+            // Validaciï¿½n bï¿½sica: un ID 0 o negativo no sirve.
             if (id <= 0) return null;
 
-            // Si el ID está bien, se consulta en la base.
+            // Si el ID estï¿½ bien, se consulta en la base.
             return _repository.GetById(id);
+        }
+
+        // GET /api/vehiculos/{id}/historial
+        // Historial de services de un vehÃ­culo puntual.
+        public List<Service> GetByVehicleId(int vehicleId)
+        {
+            if (vehicleId <= 0) return new List<Service>();
+
+            return _repository.GetByVehicleId(vehicleId);
+        }
+
+        // GET /api/services/{id}/details
+        public List<ServiceDetail> GetDetails(int serviceId)
+        {
+            if (serviceId <= 0) return new List<ServiceDetail>();
+
+            return _repository.GetDetailsByServiceId(serviceId);
         }
 
         // POST /api/services
@@ -33,14 +50,14 @@ namespace BoxService_BackEnd.Services
             // 1. Sanitizar: limpiar textos antes de validar/guardar.
             Sanitize(service);
 
-            // 2. Validar: controlar que los datos obligatorios estén bien.
+            // 2. Validar: controlar que los datos obligatorios estï¿½n bien.
             Validate(service);
 
-            // 3. Lógica de negocio:
-            // El próximo service se calcula sumando 10.000 km.
+            // 3. Lï¿½gica de negocio:
+            // El prï¿½ximo service se calcula sumando 10.000 km.
             service.NextMileage = service.Mileage + 10000;
 
-            // El próximo service también se calcula sumando 6 meses a la fecha actual del service.
+            // El prï¿½ximo service tambiï¿½n se calcula sumando 6 meses a la fecha actual del service.
             service.NextDate = service.Date.AddMonths(6);
 
             // 4. Guardar en la base de datos usando el Repository.
@@ -51,7 +68,7 @@ namespace BoxService_BackEnd.Services
         // Crea un detalle para un service existente.
         public ServiceDetail CreateDetail(ServiceDetail detail)
         {
-            // 1. Sanitizar: limpiar la descripción.
+            // 1. Sanitizar: limpiar la descripciï¿½n.
             SanitizeDetail(detail);
 
             // 2. Validar: controlar que el detalle tenga datos correctos.
@@ -62,7 +79,7 @@ namespace BoxService_BackEnd.Services
         }
 
         // Limpieza de textos del service.
-        // Esto evita guardar valores con espacios de más.
+        // Esto evita guardar valores con espacios de mï¿½s.
         private static void Sanitize(Service service)
         {
             service.ServiceType = service.ServiceType?.Trim();
@@ -76,26 +93,26 @@ namespace BoxService_BackEnd.Services
         }
 
         // Validaciones principales del service.
-        // Si algo está mal, se lanza una excepción.
-        // Esa excepción vuelve al Controller y el Controller responde BadRequest.
+        // Si algo estï¿½ mal, se lanza una excepciï¿½n.
+        // Esa excepciï¿½n vuelve al Controller y el Controller responde BadRequest.
         private static void Validate(Service service)
         {
             // La fecha es obligatoria.
             if (service.Date == default)
-                throw new Exception("Date is required.");
+                throw new ArgumentException("Date is required.");
 
             // El kilometraje tiene que ser mayor a 0.
             if (service.Mileage <= 0)
-                throw new Exception("Mileage must be greater than 0.");
+                throw new ArgumentException("Mileage must be greater than 0.");
 
             // El tipo de service es obligatorio.
-            // IsNullOrWhiteSpace controla null, vacío o solo espacios.
+            // IsNullOrWhiteSpace controla null, vacï¿½o o solo espacios.
             if (string.IsNullOrWhiteSpace(service.ServiceType))
-                throw new Exception("Service type is required.");
+                throw new ArgumentException("Service type is required.");
 
-            // El service tiene que estar asociado a un vehículo.
+            // El service tiene que estar asociado a un vehï¿½culo.
             if (service.VehicleId <= 0)
-                throw new Exception("Vehicle is required.");
+                throw new ArgumentException("Vehicle is required.");
         }
 
         // Validaciones principales del detalle del service.
@@ -103,11 +120,11 @@ namespace BoxService_BackEnd.Services
         {
             // El detalle tiene que pertenecer a un service existente.
             if (detail.ServiceId <= 0)
-                throw new Exception("Service is required.");
+                throw new ArgumentException("Service is required.");
 
-            // La descripción del detalle es obligatoria.
+            // La descripciï¿½n del detalle es obligatoria.
             if (string.IsNullOrWhiteSpace(detail.Description))
-                throw new Exception("Detail description is required.");
+                throw new ArgumentException("Detail description is required.");
         }
     }
 }

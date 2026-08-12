@@ -14,49 +14,58 @@ namespace BoxService_BackEnd.Router
 
             var method = request.HttpMethod.ToUpper();
             var path = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var basePath = path.StartsWith("/api/presupuestos") ? "/api/presupuestos" : "/api/budgets";
 
-            if (method == "GET" && path == "/api/budgets")
+            if (method == "GET" && path == basePath)
             {
                 _controller.GetAll(response);
                 return;
             }
 
-            if (method == "POST" && path == "/api/budgets")
+            if (method == "POST" && path == basePath)
             {
                 _controller.Create(request, response);
                 return;
             }
 
-            // NUEVO:
-            // Vincula un presupuesto con el service creado desde el m�dulo de Services.
+            // Vincula un presupuesto con el service creado desde el módulo de Services.
             // PUT /api/budgets/{id}/service
             if (method == "PUT" &&
-                path.StartsWith("/api/budgets/") &&
+                path.StartsWith(basePath + "/") &&
                 path.EndsWith("/service"))
             {
                 _controller.AssignService(request, response);
                 return;
             }
 
-            if (method == "PUT" && path.Contains("/status"))
+            // Transición de estado (sent | rejected | approved) unificada en un solo
+            // endpoint orientado al recurso, en vez de /status y /approve separados.
+            // PATCH /api/budgets/{id}
+            if (method == "PATCH" && TryGetId(path, basePath + "/", out _))
             {
                 _controller.UpdateStatus(request, response);
                 return;
             }
 
-            if (method == "POST" && path.Contains("/approve"))
-            {
-                _controller.Approve(request, response);
-                return;
-            }
-
-            if (method == "GET" && path.StartsWith("/api/budgets/"))
+            if (method == "GET" && path.StartsWith(basePath + "/"))
             {
                 _controller.GetById(request, response);
                 return;
             }
 
             ResponseHelper.NotFound(response, "Budget route not found");
+        }
+
+        private static bool TryGetId(string path, string prefix, out int id)
+        {
+            id = 0;
+
+            if (!path.StartsWith(prefix))
+                return false;
+
+            var segment = path.Substring(prefix.Length).Trim('/');
+
+            return int.TryParse(segment, out id);
         }
     }
 }

@@ -35,11 +35,13 @@ namespace BoxService_BackEnd.Repositories
             return (long)cmd.ExecuteScalar()! > 0;
         }
 
-        public string GetLastNumber()
+        // Ver comentario en BudgetRepository.GetNextNumber: usar una SEQUENCE evita
+        // que dos facturas concurrentes terminen con el mismo número.
+        public long GetNextNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
-            using var cmd  = new NpgsqlCommand("SELECT numero FROM facturas ORDER BY id_factura DESC LIMIT 1", conn);
-            return cmd.ExecuteScalar()?.ToString() ?? "F-0000";
+            using var cmd  = new NpgsqlCommand("SELECT nextval('facturas_numero_seq')", conn);
+            return (long)cmd.ExecuteScalar()!;
         }
 
         /// <summary>
@@ -92,7 +94,8 @@ namespace BoxService_BackEnd.Repositories
         {
             InvoiceId = (int)r["id_factura"],
             Number    = r["numero"].ToString()!,
-            Date      = r["fecha"].ToString()!,
+            // Npgsql mapea las columnas DATE de Postgres a DateOnly, no a DateTime.
+            Date      = ((DateOnly)r["fecha"]).ToString("yyyy-MM-dd"),
             Total     = (decimal)r["total"],
             Status    = r["estado"].ToString()!,
             ServiceId = (int)r["id_service"],

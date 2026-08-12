@@ -77,16 +77,20 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public string GetLastNumber()
+        // Genera el próximo número de presupuesto de forma atómica usando una
+        // SEQUENCE de Postgres. nextval() nunca devuelve el mismo valor dos veces,
+        // incluso si dos requests concurrentes lo llaman al mismo tiempo — a
+        // diferencia de leer el último número y sumarle 1 en memoria.
+        public long GetNextNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT numero FROM presupuestos ORDER BY id_presupuesto DESC LIMIT 1",
+                "SELECT nextval('presupuestos_numero_seq')",
                 conn
             );
 
-            return cmd.ExecuteScalar()?.ToString() ?? "P-0000";
+            return (long)cmd.ExecuteScalar()!;
         }
 
         public int Create(Budget b)
@@ -229,9 +233,12 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
 
+            // El presupuesto pasa a "completed" acá: es el momento en el que el
+            // trabajo efectivamente se hizo (se generó el service), no cuando
+            // se aprobó. "approved" pasa a significar "esperando que se haga".
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
-                SET id_service = @id_service
+                SET id_service = @id_service, estado = 'completed'
                 WHERE id_presupuesto = @id_presupuesto", conn);
 
             cmd.Parameters.AddWithValue("id_service", serviceId);
@@ -249,7 +256,8 @@ namespace BoxService_BackEnd.Repositories
         {
             BudgetId = (int)r["id_presupuesto"],
             Number = r["numero"].ToString()!,
-            Date = r["fecha"].ToString()!,
+            // Npgsql mapea las columnas DATE de Postgres a DateOnly, no a DateTime.
+            Date = ((DateOnly)r["fecha"]).ToString("yyyy-MM-dd"),
             Status = r["estado"].ToString()!,
             Notes = r["observaciones"] as string,
             VehicleId = (int)r["id_vehiculo"],

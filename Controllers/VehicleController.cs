@@ -10,37 +10,52 @@ namespace BoxService_BackEnd.Controllers
     public class VehicleController
     {
         private readonly VehicleService _service;
+        private readonly ServicesService _servicesService;
 
-        public VehicleController(VehicleService service)
+        public VehicleController(VehicleService service, ServicesService servicesService)
         {
             _service = service;
+            _servicesService = servicesService;
         }
 
-        public void GetAll(HttpListenerResponse response)
+        // GET /api/vehiculos            -> lista completa
+        // GET /api/vehiculos?plate=ABC   -> filtra por patente (reemplaza al viejo /vehiculos/buscar)
+        public void GetAll(HttpListenerRequest request, HttpListenerResponse response)
         {
-            var vehicles = _service.List();
-            ResponseHelper.Ok(response, vehicles);
+            try
+            {
+                var plate = request.QueryString["plate"];
+
+                if (!string.IsNullOrWhiteSpace(plate))
+                {
+                    var vehicle = _service.FindByPlate(plate.Trim());
+                    if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
+                    ResponseHelper.Ok(response, vehicle);
+                    return;
+                }
+
+                ResponseHelper.Ok(response, _service.List());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing vehicles: {ex}");
+                ResponseHelper.InternalError(response);
+            }
         }
 
         public void GetById(HttpListenerRequest request, HttpListenerResponse response, int id)
         {
-            var vehicle = _service.GetById(id);
-            if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
-            ResponseHelper.Ok(response, vehicle);
-        }
-
-        public void SearchByPlate(HttpListenerRequest request, HttpListenerResponse response)
-        {
-            var plate = request.QueryString["plate"];
-            if (string.IsNullOrWhiteSpace(plate))
+            try
             {
-                ResponseHelper.BadRequest(response, "Query param 'plate' is required.");
-                return;
+                var vehicle = _service.GetById(id);
+                if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
+                ResponseHelper.Ok(response, vehicle);
             }
-
-            var vehicle = _service.FindByPlate(plate.Trim());
-            if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
-            ResponseHelper.Ok(response, vehicle);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting vehicle: {ex}");
+                ResponseHelper.InternalError(response);
+            }
         }
 
         public void Create(HttpListenerRequest request, HttpListenerResponse response)
@@ -77,9 +92,22 @@ namespace BoxService_BackEnd.Controllers
             }
         }
 
-        public void GetHistory(HttpListenerResponse response)
+        // GET /api/vehiculos/{id}/historial
+        public void GetHistory(HttpListenerResponse response, int vehicleId)
         {
-            ResponseHelper.NotFound(response, "Vehicle history not implemented yet.");
+            try
+            {
+                var vehicle = _service.GetById(vehicleId);
+                if (vehicle is null) { ResponseHelper.NotFound(response, "Vehicle not found."); return; }
+
+                var history = _servicesService.GetByVehicleId(vehicleId);
+                ResponseHelper.Ok(response, history);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting vehicle history: {ex}");
+                ResponseHelper.InternalError(response);
+            }
         }
     }
 }

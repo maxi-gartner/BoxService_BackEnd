@@ -14,26 +14,28 @@ namespace BoxService_BackEnd.Router
 
             var method = request.HttpMethod.ToUpper();
             var path   = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
+            var basePath = path.StartsWith("/api/facturas") ? "/api/facturas" : "/api/invoices";
 
-            if (method == "GET" && path == "/api/invoices")
+            if (method == "GET" && path == basePath)
             {
                 _controller.GetAll(response);
                 return;
             }
 
-            if (method == "POST" && path == "/api/invoices")
+            if (method == "POST" && path == basePath)
             {
                 _controller.Create(request, response);
                 return;
             }
 
-            if (method == "PUT" && path.StartsWith("/api/invoices/"))
+            // PATCH /api/invoices/{id} — cambia el estado (paid | cancelled).
+            if (method == "PATCH" && path.StartsWith(basePath + "/"))
             {
                 _controller.UpdateStatus(request, response);
                 return;
             }
 
-            if (method == "GET" && path.StartsWith("/api/invoices/"))
+            if (method == "GET" && path.StartsWith(basePath + "/"))
             {
                 _controller.GetById(request, response);
                 return;

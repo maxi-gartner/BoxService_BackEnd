@@ -160,32 +160,51 @@ Respuesta esperada:
 
 ## Endpoints disponibles
 
+Todas las rutas excepto `/` y `/health` requieren el header `X-Api-Key`
+(ver [Autenticación](#autenticación) más abajo). Cada recurso acepta su
+nombre en inglés o en español de forma indistinta (`/api/clients` ==
+`/api/clientes`, `/api/budgets` == `/api/presupuestos`, `/api/invoices` ==
+`/api/facturas`).
+
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/health` | Estado del servidor y la base de datos |
+| GET | `/health` | Estado del servidor y la base de datos (no requiere API key) |
 | GET | `/api/clientes` | Lista todos los clientes |
 | GET | `/api/clientes/{id}` | Obtiene un cliente por ID |
 | GET | `/api/clientes/{id}/vehiculos` | Lista los vehículos de un cliente |
 | POST | `/api/clientes` | Crea un nuevo cliente |
 | GET | `/api/vehiculos` | Lista todos los vehículos |
+| GET | `/api/vehiculos?plate=` | Filtra por patente |
 | GET | `/api/vehiculos/{id}` | Obtiene un vehículo por ID |
-| GET | `/api/vehiculos/buscar?patente=` | Busca un vehículo por patente |
 | GET | `/api/vehiculos/{id}/historial` | Historial de services del vehículo |
 | POST | `/api/vehiculos` | Crea un nuevo vehículo |
 | GET | `/api/presupuestos` | Lista todos los presupuestos |
-| GET | `/api/presupuestos/{id}` | Obtiene un presupuesto con su detalle |
+| GET | `/api/presupuestos/{id}` | Obtiene un presupuesto con su detalle y total |
 | POST | `/api/presupuestos` | Crea un presupuesto con sus ítems |
-| PUT | `/api/presupuestos/{id}/estado` | Cambia estado (enviado / rechazado) |
-| POST | `/api/presupuestos/{id}/aprobar` | Aprueba y genera el service automáticamente ⚡ |
+| PATCH | `/api/presupuestos/{id}` | Cambia estado: `sent` \| `rejected` \| `approved` |
+| PUT | `/api/presupuestos/{id}/service` | Vincula el presupuesto aprobado con un service ya creado |
 | GET | `/api/services` | Lista todos los services |
 | GET | `/api/services/{id}` | Obtiene un service con su detalle |
 | POST | `/api/services` | Crea un service manual |
+| POST | `/api/services/{id}/details` | Agrega un detalle a un service existente |
 | GET | `/api/facturas` | Lista todas las facturas |
 | GET | `/api/facturas/{id}` | Obtiene una factura por ID |
 | POST | `/api/facturas` | Emite una factura desde un service ⚡ |
-| PUT | `/api/facturas/{id}/estado` | Cambia estado (cobrada / anulada) |
+| PATCH | `/api/facturas/{id}` | Cambia estado: `paid` \| `cancelled` |
 
 > ⚡ Estos endpoints usan transacción SQL. Si cualquier paso falla se hace ROLLBACK completo.
+>
+> Aprobar un presupuesto (`PATCH .../{id}` con `{"status":"approved"}`) ya
+> **no** crea un service automáticamente — eso pasa desde el módulo de
+> Services, que después vincula el service creado con `PUT .../{id}/service`.
+
+### Autenticación
+
+Un candado simple, no un sistema de auth completo: todas las rutas de
+negocio requieren el header `X-Api-Key` con el valor configurado en
+`appsettings.json` (campo `ApiKey`, por defecto `boxservice-dev-key` en
+desarrollo). El frontend ya lo manda automáticamente en cada request
+(`js/api.js`) — si cambiás la key acá, actualizala también ahí.
 
 ---
 

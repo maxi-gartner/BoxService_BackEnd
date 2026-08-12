@@ -9,6 +9,7 @@ namespace BoxService_BackEnd.Router
         BudgetRouter budgets,
         InvoiceRouter invoices,
         ServiceRouter services,
+        CatalogRouter catalog,
         HealthRouter health)
     {
         private readonly ClientRouter _clients = clients;
@@ -16,6 +17,7 @@ namespace BoxService_BackEnd.Router
         private readonly BudgetRouter _budgets = budgets;
         private readonly InvoiceRouter _invoices = invoices;
         private readonly ServiceRouter _services = services;
+        private readonly CatalogRouter _catalog = catalog;
         private readonly HealthRouter _health = health;
 
         public void Route(HttpListenerContext context)
@@ -62,7 +64,7 @@ namespace BoxService_BackEnd.Router
 
                 // ── BUDGETS ──────────────────────────
 
-                if (path.StartsWith("/api/budgets"))
+                if (path.StartsWith("/api/budgets") || path.StartsWith("/api/presupuestos"))
                 {
                     _budgets.Route(context);
                     return;
@@ -70,7 +72,7 @@ namespace BoxService_BackEnd.Router
 
                 // ── INVOICES ─────────────────────────
 
-                if (path.StartsWith("/api/invoices"))
+                if (path.StartsWith("/api/invoices") || path.StartsWith("/api/facturas"))
                 {
                     _invoices.Route(context);
                     return;
@@ -81,6 +83,14 @@ namespace BoxService_BackEnd.Router
                 if (path.StartsWith("/api/services"))
                 {
                     _services.Route(context);
+                    return;
+                }
+
+                // ── CATALOGO ─────────────────────────
+
+                if (path.StartsWith("/api/catalogo"))
+                {
+                    _catalog.Route(context);
                     return;
                 }
 

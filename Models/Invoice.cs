@@ -11,4 +11,16 @@ namespace BoxService_BackEnd.Models
         public int     ServiceId { get; set; }
         public int?    BudgetId  { get; set; }
     }
+
+    // DTOs de request — camelCase, igual que el resto de la API.
+    public class InvoiceCreateRequest
+    {
+        public int  ServiceId { get; set; }
+        public int? BudgetId  { get; set; }
+    }
+
+    public class InvoiceStatusRequest
+    {
+        public string Status { get; set; } = "";
+    }
 }

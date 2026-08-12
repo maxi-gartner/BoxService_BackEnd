@@ -20,21 +20,17 @@ namespace BoxService_BackEnd.Router
             var method = request.HttpMethod.ToUpper();
             var path   = request.Url?.AbsolutePath.TrimEnd('/') ?? "";
 
+            // GET /api/vehiculos            -> lista completa
+            // GET /api/vehiculos?plate=ABC   -> filtra por patente (antes era /vehiculos/buscar)
             if (method == "GET" && path == "/api/vehiculos")
             {
-                _controller.GetAll(response);
+                _controller.GetAll(request, response);
                 return;
             }
 
-            if (method == "GET" && path.Contains("/buscar"))
+            if (method == "GET" && TryGetHistoryId(path, out int historyVehicleId))
             {
-                _controller.SearchByPlate(request, response);
-                return;
-            }
-
-            if (method == "GET" && path.EndsWith("/historial"))
-            {
-                _controller.GetHistory(response);
+                _controller.GetHistory(response, historyVehicleId);
                 return;
             }
 
@@ -51,6 +47,22 @@ namespace BoxService_BackEnd.Router
             }
 
             ResponseHelper.NotFound(response, "Vehicle route not found");
+        }
+
+        private static bool TryGetHistoryId(string path, out int id)
+        {
+            id = 0;
+
+            const string prefix = "/api/vehiculos/";
+            const string suffix = "/historial";
+
+            if (!path.StartsWith(prefix) || !path.EndsWith(suffix))
+                return false;
+
+            var segment = path.Substring(prefix.Length);
+            segment = segment.Substring(0, segment.Length - suffix.Length).Trim('/');
+
+            return int.TryParse(segment, out id);
         }
 
         private static bool TryGetId(string path, string prefix, out int id)
