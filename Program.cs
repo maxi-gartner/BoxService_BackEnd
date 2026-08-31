@@ -1,71 +1,74 @@
-﻿using System.Text.Json;
-using BoxService_BackEnd;
-using BoxService_BackEnd.Database;
+using BoxService_BackEnd.Api;
+using BoxService_BackEnd.Data;
 
-// ── Leer connection string y API key desde appsettings.json ────
-string connectionString;
-string apiKey;
+var builder = WebApplication.CreateBuilder(args);
 
-// Clave por defecto para desarrollo local. Cambiala en appsettings.json
-// (campo "ApiKey") y en js/api.js del frontend — tienen que coincidir.
-const string DefaultApiKey = "boxservice-dev-key";
+builder.WebHost.UseUrls("http://localhost:5001");
 
-try
+builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    var json   = await File.ReadAllTextAsync("appsettings.json");
-    var config = JsonDocument.Parse(json).RootElement;
+    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+});
 
-    connectionString = config
-        .GetProperty("ConnectionStrings")
-        .GetProperty("DefaultConnection")
-        .GetString()!;
-
-    apiKey = config.TryGetProperty("ApiKey", out var apiKeyProp)
-        ? apiKeyProp.GetString() ?? DefaultApiKey
-        : DefaultApiKey;
-}
-catch
+builder.Services.AddCors(options =>
 {
-    Console.WriteLine("[AVISO] No se encontró appsettings.json — usando variables de entorno.");
-    connectionString = Environment.GetEnvironmentVariable("BOXSERVICE_CONNECTION_STRING")
-        ?? throw new Exception("No hay connection string. Creá appsettings.json basándote en appsettings.example.json");
-    apiKey = Environment.GetEnvironmentVariable("BOXSERVICE_API_KEY") ?? DefaultApiKey;
-}
-
-if (apiKey == DefaultApiKey)
-{
-    Console.WriteLine("[AVISO] Usando la API key por defecto de desarrollo. No la uses en un servidor expuesto a internet.");
-}
-
-// ── Configurar conexión compartida ───────────────────
-DatabaseConnection.Configure(connectionString);
-
-// ── Comandos especiales ──────────────────────────────
-if (args.Contains("--setup"))
-{
-    Console.WriteLine("╔══════════════════════════════╗");
-    Console.WriteLine("║   BoxService — Setup DB      ║");
-    Console.WriteLine("╚══════════════════════════════╝");
-    await DatabaseSetup.SetupAsync(connectionString);
-    return;
-}
-
-if (args.Contains("--reset"))
-{
-    Console.WriteLine("╔══════════════════════════════╗");
-    Console.WriteLine("║   BoxService — Reset DB      ║");
-    Console.WriteLine("╚══════════════════════════════╝");
-    Console.Write("¿Seguro que querés borrar toda la base de datos? (s/n): ");
-    var confirm = Console.ReadLine();
-    if (confirm?.ToLower() != "s")
+    options.AddDefaultPolicy(policy =>
     {
-        Console.WriteLine("Cancelado.");
-        return;
-    }
-    await DatabaseSetup.ResetAsync(connectionString);
-    return;
-}
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
-// ── Arrancar servidor ────────────────────────────────
-var server = new Server(apiKey);
-server.Start();
+builder.Services.AddSingleton<PostgresConnectionFactory>();
+
+var app = builder.Build();
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await context.Response.WriteAsJsonAsync(
+            ApiEnvelope<object>.Fail(500, "Error interno del servidor")
+        );
+    });
+});
+
+app.UseCors();
+
+app.MapGet("/", () => ApiEnvelope<object>.Ok(new
+{
+    name = "BoxService API",
+    framework = "ASP.NET Core",
+    version = "2.0.0"
+}));
+
+app.MapGet("/health", async (
+    PostgresConnectionFactory connectionFactory,
+    CancellationToken cancellationToken
+) =>
+{
+    try
+    {
+        await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
+
+        return Results.Ok(ApiEnvelope<object>.Ok(new
+        {
+            status = "healthy",
+            database = "connected",
+            timestamp = DateTime.UtcNow,
+            version = "2.0.0"
+        }));
+    }
+    catch
+    {
+        return Results.Json(
+            ApiEnvelope<object>.Fail(503, "Database unreachable"),
+            statusCode: StatusCodes.Status503ServiceUnavailable
+        );
+    }
+});
+
+app.Run();
