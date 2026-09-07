@@ -80,9 +80,15 @@ El proyecto usa:
 - `Directory.Build.props` para activar análisis de código y reglas de estilo en build.
 - `dotnet format` para aplicar formato automático.
 
-Comandos recomendados:
+`.editorconfig` y `Directory.Build.props` aplican a **todo** el proyecto, no
+solo a los archivos nuevos de la migración — el código viejo (`Router/`,
+`Services/`, `Controllers/`, `Database/`, `Models/`, `Repositories/`,
+`ResponseHelper.cs`, `Server.cs`) nunca se formateó con estas reglas, así
+que `dotnet format` sin argumentos va a marcar ~40 errores ahí que no
+tienen nada que ver con lo que estés tocando. Mientras no se normalice ese
+código en una pasada aparte, apuntá el comando solo a lo que cambiaste:
 
 ```powershell
-dotnet format
+dotnet format --include Ruta/Al/Archivo.cs
 dotnet build
 ```

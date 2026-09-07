@@ -49,7 +49,7 @@ namespace BoxService_BackEnd.Repositories
                     modelo, 
                     anio, 
                     patente, 
-                    kilometraje_actual, -- lo traemos cuando buscamos un vehículo por ID.
+                    kilometraje_actual, -- lo traemos cuando buscamos un vehï¿½culo por ID.
                     created_at
                 FROM vehiculos 
                 WHERE id_vehiculo = @id;", conn);
@@ -85,6 +85,38 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
+        public List<Vehicle> GetByClientId(int clientId)
+        {
+            var result = new List<Vehicle>();
+
+            using var conn = DatabaseConnection.GetConnection();
+
+            using var cmd = new NpgsqlCommand(@"
+                SELECT
+                    id_vehiculo,
+                    id_cliente,
+                    marca,
+                    modelo,
+                    anio,
+                    patente,
+                    kilometraje_actual,
+                    created_at
+                FROM vehiculos
+                WHERE id_cliente = @id_cliente
+                ORDER BY id_vehiculo;", conn);
+
+            cmd.Parameters.AddWithValue("id_cliente", clientId);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                result.Add(MapRow(reader));
+            }
+
+            return result;
+        }
+
         public Vehicle Create(Vehicle vehicle)
         {
             using var conn = DatabaseConnection.GetConnection();
@@ -96,7 +128,7 @@ namespace BoxService_BackEnd.Repositories
                     modelo, 
                     anio, 
                     patente,
-                    kilometraje_actual -- Guardamos el kilometraje actual al crear el vehículo.
+                    kilometraje_actual -- Guardamos el kilometraje actual al crear el vehï¿½culo.
                 )
                 VALUES (
                     @id_cliente, 
@@ -104,7 +136,7 @@ namespace BoxService_BackEnd.Repositories
                     @modelo, 
                     @anio, 
                     @patente,
-                    @kilometraje_actual -- Parámetro que viene desde vehicle.CurrentMileage.
+                    @kilometraje_actual -- Parï¿½metro que viene desde vehicle.CurrentMileage.
                 )
                 RETURNING id_vehiculo, created_at;", conn);
 
