@@ -11,7 +11,7 @@ Sistema de gestión para lubricentros y talleres mecánicos
 # BoxService — Backend
 
 > API REST para el sistema de gestión de lubricentro.
-> Construida en C# puro con `HttpListener`, sin ASP.NET ni frameworks MVC.
+> Migrando a ASP.NET Core + PostgreSQL.
 
 ---
 
@@ -19,7 +19,7 @@ Sistema de gestión para lubricentros y talleres mecánicos
 
 Este repositorio contiene el servidor backend de **BoxService**, un sistema de gestión para lubricentros y centros de service vehicular.
 
-Es un backend puro, sin interfaz gráfica ni ASP.NET MVC: expone una API HTTP que recibe requests del frontend, ejecuta la lógica de negocio y persiste los datos en PostgreSQL. Toda la comunicación se hace mediante JSON siguiendo el patrón envelope:
+Es un backend sin interfaz gráfica: expone una API HTTP que recibe requests del frontend, ejecuta la lógica de negocio y persiste los datos en PostgreSQL. Toda la comunicación se hace mediante JSON siguiendo el patrón envelope:
 
 ```json
 { "success": true,  "data": {},   "error": null }
@@ -50,9 +50,9 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 | Capa | Tecnología |
 |---|---|
 | Lenguaje | C# .NET 8 |
-| Servidor HTTP | `HttpListener` (sin ASP.NET) |
+| Servidor HTTP | ASP.NET Core |
 | Base de datos | PostgreSQL |
-| Driver BD | Npgsql 8.x |
+| Driver BD | Npgsql |
 | IDE | Visual Studio Community 2022 |
 
 ---
@@ -61,16 +61,17 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 
 ```
 BoxService-BackEnd/
+├── Api/                ← envelope, errores y helpers HTTP compartidos
 ├── Controllers/        ← reciben el request y devuelven la respuesta JSON
+├── Data/               ← conexión PostgreSQL y configuración de persistencia
+├── DTOs/               ← requests y responses expuestos por la API
 ├── Services/           ← lógica de negocio y validaciones
 ├── Repositories/       ← único punto de acceso a la base de datos
 ├── Models/             ← clases que representan las entidades
-├── Router/             ← decide qué controlador atiende cada ruta
 ├── Database/
 │   └── migrations/     ← scripts SQL para crear y modificar tablas
-├── Server.cs           ← inicia el HttpListener en localhost:5001
-├── ResponseHelper.cs   ← helpers para respuestas JSON estandarizadas
-├── Program.cs          ← punto de entrada
+├── docs/               ← documentación técnica y convenciones
+├── Program.cs          ← configura y arranca ASP.NET Core en localhost:5001
 └── BoxService-BackEnd.csproj
 ```
 
@@ -213,8 +214,6 @@ desarrollo). El frontend ya lo manda automáticamente en cada request
 ```
 Frontend (fetch)
       ↓
-  Router.cs         → decide qué controller maneja la ruta
-      ↓
   Controller        → recibe el request, llama al Service
       ↓
   Service           → valida, aplica lógica de negocio
@@ -249,4 +248,8 @@ clientes
 - Nunca poner lógica de negocio en los Controllers
 - Nunca acceder a la BD desde Services — solo desde Repositories
 - Nunca editar una migración ya aplicada — crear una nueva
-- `Router.cs` solo lo modifica Maxi
+
+Más detalle:
+
+- [Estructura ASP.NET Core](docs/ESTRUCTURA_BACKEND_CORE.md)
+- [Convenciones Backend ASP.NET Core](docs/CONVENCIONES_BACKEND_CORE.md)
