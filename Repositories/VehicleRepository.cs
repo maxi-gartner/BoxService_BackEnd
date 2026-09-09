@@ -49,7 +49,7 @@ namespace BoxService_BackEnd.Repositories
                     modelo, 
                     anio, 
                     patente, 
-                    kilometraje_actual, -- lo traemos cuando buscamos un veh�culo por ID.
+                    kilometraje_actual,
                     created_at
                 FROM vehiculos 
                 WHERE id_vehiculo = @id;", conn);
@@ -76,7 +76,7 @@ namespace BoxService_BackEnd.Repositories
                     kilometraje_actual, -- lo traemos cuando buscamos por patente.
                     created_at
                 FROM vehiculos 
-                WHERE patente = @patente;", conn);
+                WHERE UPPER(patente) = UPPER(@patente);", conn);
 
             cmd.Parameters.AddWithValue("patente", plate);
 
@@ -128,7 +128,7 @@ namespace BoxService_BackEnd.Repositories
                     modelo, 
                     anio, 
                     patente,
-                    kilometraje_actual -- Guardamos el kilometraje actual al crear el veh�culo.
+                    kilometraje_actual
                 )
                 VALUES (
                     @id_cliente, 
@@ -136,7 +136,7 @@ namespace BoxService_BackEnd.Repositories
                     @modelo, 
                     @anio, 
                     @patente,
-                    @kilometraje_actual -- Par�metro que viene desde vehicle.CurrentMileage.
+                    @kilometraje_actual
                 )
                 RETURNING id_vehiculo, created_at;", conn);
 
