@@ -25,14 +25,17 @@ namespace BoxService_BackEnd.Services
 
             return _repo.Create(new CatalogItem
             {
-                Name  = req.Name.Trim(),
-                Type  = type,
+                Name = req.Name.Trim(),
+                Type = type,
                 Price = req.Price
             });
         }
 
         public (bool ok, bool notFound, string error) Update(int id, CatalogItemUpdateRequest req)
         {
+            if (req.Name is not null && string.IsNullOrWhiteSpace(req.Name))
+                return (false, false, "name cannot be empty.");
+
             if (req.Price is < 0)
                 return (false, false, "price cannot be negative.");
 

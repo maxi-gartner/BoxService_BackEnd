@@ -7,8 +7,9 @@ namespace BoxService_BackEnd.Services
 {
     public class InvoiceService
     {
-        private readonly InvoiceRepository _repo       = new();
-        private readonly BudgetRepository  _budgetRepo = new();
+        private readonly InvoiceRepository _repo = new();
+        private readonly BudgetRepository _budgetRepo = new();
+        private readonly ServicesRepository _servicesRepo = new();
 
         public List<Invoice> GetAll() => _repo.GetAll();
 
@@ -18,6 +19,9 @@ namespace BoxService_BackEnd.Services
         {
             if (req.ServiceId <= 0)
                 return (false, false, "serviceId is required", null);
+
+            if (_servicesRepo.GetById(req.ServiceId) is null)
+                return (false, false, "Service does not exist", null);
 
             if (_repo.InvoiceExistsForService(req.ServiceId))
                 return (false, false, "This service already has an invoice", null);
@@ -35,31 +39,23 @@ namespace BoxService_BackEnd.Services
                     total += d.Subtotal;
             }
 
-            try
+            var nro = _repo.GetNextNumber();
+            var number = $"F-{nro:D4}";
+
+            var invoice = new Invoice
             {
-                var nro    = _repo.GetNextNumber();
-                var number = $"F-{nro:D4}";
+                Number = number,
+                Total = total,
+                Status = "issued",
+                ServiceId = req.ServiceId,
+                BudgetId = req.BudgetId
+            };
 
-                var invoice = new Invoice
-                {
-                    Number    = number,
-                    Total     = total,
-                    Status    = "issued",
-                    ServiceId = req.ServiceId,
-                    BudgetId  = req.BudgetId
-                };
+            var id = _repo.CreateWithTransaction(invoice);
+            invoice.InvoiceId = id;
+            invoice.Date = DateTime.Today.ToString("yyyy-MM-dd");
 
-                var id = _repo.CreateWithTransaction(invoice);
-                invoice.InvoiceId = id;
-                invoice.Date      = DateTime.Today.ToString("yyyy-MM-dd");
-
-                return (true, false, "", invoice);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating invoice: {ex}");
-                return (false, false, "Could not create the invoice.", null);
-            }
+            return (true, false, "", invoice);
         }
 
         public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, InvoiceStatusRequest req)

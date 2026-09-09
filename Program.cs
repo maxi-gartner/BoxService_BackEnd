@@ -7,6 +7,8 @@ using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
+    options.ThrowOnBadRequest = false);
 
 builder.WebHost.UseUrls("http://localhost:5001");
 
@@ -35,6 +37,11 @@ builder.Services.AddSingleton<PostgresConnectionFactory>();
 builder.Services.AddScoped<ClientRepository>();
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<VehicleRepository>();
+builder.Services.AddScoped<VehicleService>();
+builder.Services.AddScoped<ServicesService>();
+builder.Services.AddScoped<BudgetService>();
+builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddScoped<CatalogService>();
 
 var app = builder.Build();
 
@@ -72,6 +79,14 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors();
+
+app.UseStatusCodePages(async statusContext =>
+{
+    var response = statusContext.HttpContext.Response;
+    await response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(
+        response.StatusCode,
+        response.StatusCode == 404 ? "Route not found." : "Invalid request."));
+});
 
 app.Use(async (context, next) =>
 {
@@ -173,5 +188,11 @@ app.MapPost("/clients", (ClientCreateRequest request, ClientService service) =>
         return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 });
+
+app.MapVehicleEndpoints();
+app.MapBudgetEndpoints();
+app.MapServiceEndpoints();
+app.MapInvoiceEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();
