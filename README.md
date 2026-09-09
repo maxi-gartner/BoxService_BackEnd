@@ -1,4 +1,4 @@
-﻿<h1 align="center">🚗 BoxService</h1>
+<h1 align="center">🚗 BoxService</h1>
 <p align="center">
 Sistema de gestión para lubricentros y talleres mecánicos
 </p>
@@ -11,7 +11,7 @@ Sistema de gestión para lubricentros y talleres mecánicos
 # BoxService — Backend
 
 > API REST para el sistema de gestión de lubricentro.
-> Migrando a ASP.NET Core + PostgreSQL.
+> Módulos funcionales en ASP.NET Core + PostgreSQL. Auth/JWT y multi-tenant pendientes.
 
 ---
 
@@ -61,8 +61,8 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 
 ```
 BoxService-BackEnd/
-├── Api/                ← envelope, errores y helpers HTTP compartidos
-├── Controllers/        ← reciben el request y devuelven la respuesta JSON
+├── Api/                ← endpoints ASP.NET Core, envelope y errores HTTP
+├── Controllers/        ← controllers HttpListener legados, no registrados
 ├── Data/               ← conexión PostgreSQL y configuración de persistencia
 ├── DTOs/               ← requests y responses expuestos por la API
 ├── Services/           ← lógica de negocio y validaciones
@@ -102,9 +102,9 @@ BoxService-BackEnd/
 git clone https://github.com/tu-usuario/BoxService-BackEnd.git
 ```
 
-### 2. Instalar Npgsql
+### 2. Restaurar dependencias
 
-Click derecho en el proyecto → **Manage NuGet Packages** → buscar `Npgsql` → instalar versión **8.x**
+Ejecutar `dotnet restore` para instalar las versiones definidas en el proyecto.
 
 ### 3. Crear la base de datos
 
@@ -124,6 +124,10 @@ Abrir cada archivo en `Database/migrations/` y ejecutarlos en este orden:
 003_crear_presupuestos.sql
 004_crear_services.sql
 005_crear_facturas.sql
+006_add_id_presupuesto_to_services.sql
+007_add_numero_sequences.sql
+008_crear_catalogo_servicios.sql
+009_vehicle_year_nullable.sql
 ```
 
 ### 5. Correr el proyecto
@@ -139,7 +143,7 @@ http://localhost:5001
 Abrir el navegador o Postman y acceder a:
 
 ```
-GET http://localhost:5000/health
+GET http://localhost:5001/health
 ```
 
 Respuesta esperada:
@@ -162,36 +166,41 @@ Respuesta esperada:
 ## Endpoints disponibles
 
 Todas las rutas excepto `/` y `/health` requieren el header `X-Api-Key`
-(ver [Autenticación](#autenticación) más abajo). Cada recurso acepta su
-nombre en inglés o en español de forma indistinta (`/api/clients` ==
-`/api/clientes`, `/api/budgets` == `/api/presupuestos`, `/api/invoices` ==
-`/api/facturas`).
+(ver [Autenticación](#autenticación) más abajo). La API nueva usa nombres
+en inglés, sin prefijo `/api`. Los alias del servidor HttpListener anterior
+no están registrados en el pipeline nuevo. Consultar la lista actual en
+[Estructura ASP.NET Core](docs/ESTRUCTURA_BACKEND_CORE.md).
 
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | Estado del servidor y la base de datos (no requiere API key) |
-| GET | `/api/clientes` | Lista todos los clientes |
-| GET | `/api/clientes/{id}` | Obtiene un cliente por ID |
-| GET | `/api/clientes/{id}/vehiculos` | Lista los vehículos de un cliente |
-| POST | `/api/clientes` | Crea un nuevo cliente |
-| GET | `/api/vehiculos` | Lista todos los vehículos |
-| GET | `/api/vehiculos?plate=` | Filtra por patente |
-| GET | `/api/vehiculos/{id}` | Obtiene un vehículo por ID |
-| GET | `/api/vehiculos/{id}/historial` | Historial de services del vehículo |
-| POST | `/api/vehiculos` | Crea un nuevo vehículo |
-| GET | `/api/presupuestos` | Lista todos los presupuestos |
-| GET | `/api/presupuestos/{id}` | Obtiene un presupuesto con su detalle y total |
-| POST | `/api/presupuestos` | Crea un presupuesto con sus ítems |
-| PATCH | `/api/presupuestos/{id}` | Cambia estado: `sent` \| `rejected` \| `approved` |
-| PUT | `/api/presupuestos/{id}/service` | Vincula el presupuesto aprobado con un service ya creado |
-| GET | `/api/services` | Lista todos los services |
-| GET | `/api/services/{id}` | Obtiene un service con su detalle |
-| POST | `/api/services` | Crea un service manual |
-| POST | `/api/services/{id}/details` | Agrega un detalle a un service existente |
-| GET | `/api/facturas` | Lista todas las facturas |
-| GET | `/api/facturas/{id}` | Obtiene una factura por ID |
-| POST | `/api/facturas` | Emite una factura desde un service ⚡ |
-| PATCH | `/api/facturas/{id}` | Cambia estado: `paid` \| `cancelled` |
+| GET | `/clients` | Lista todos los clientes |
+| GET | `/clients/{id}` | Obtiene un cliente por ID |
+| GET | `/clients/{id}/vehicles` | Lista los vehículos de un cliente |
+| POST | `/clients` | Crea un nuevo cliente |
+| GET | `/vehicles` | Lista todos los vehículos |
+| GET | `/vehicles?plate=` | Filtra por patente |
+| GET | `/vehicles/{id}` | Obtiene un vehículo por ID |
+| GET | `/vehicles/{id}/history` | Historial de services del vehículo |
+| POST | `/vehicles` | Crea un nuevo vehículo |
+| GET | `/budgets` | Lista todos los presupuestos |
+| GET | `/budgets/{id}` | Obtiene un presupuesto con su detalle y total |
+| POST | `/budgets` | Crea un presupuesto con sus ítems |
+| PATCH | `/budgets/{id}` | Cambia estado: `sent` \| `rejected` \| `approved` |
+| PUT | `/budgets/{id}/service` | Vincula el presupuesto aprobado con un service ya creado |
+| GET | `/services` | Lista todos los services |
+| GET | `/services/{id}` | Obtiene un service |
+| GET | `/services/{id}/details` | Obtiene los detalles de un service |
+| POST | `/services` | Crea un service manual |
+| POST | `/services/{id}/details` | Agrega un detalle a un service existente |
+| GET | `/invoices` | Lista todas las facturas |
+| GET | `/invoices/{id}` | Obtiene una factura por ID |
+| POST | `/invoices` | Emite una factura desde un service ⚡ |
+| PATCH | `/invoices/{id}` | Cambia estado: `paid` \| `cancelled` |
+| GET | `/catalog` | Lista el catálogo |
+| POST | `/catalog` | Crea un ítem de catálogo |
+| PATCH | `/catalog/{id}` | Edita un ítem de catálogo |
+| DELETE | `/catalog/{id}` | Elimina un ítem de catálogo |
 
 > ⚡ Estos endpoints usan transacción SQL. Si cualquier paso falla se hace ROLLBACK completo.
 >
@@ -205,7 +214,7 @@ Un candado simple, no un sistema de auth completo: todas las rutas de
 negocio requieren el header `X-Api-Key` con el valor configurado en
 `appsettings.json` (campo `ApiKey`, por defecto `boxservice-dev-key` en
 desarrollo). El frontend ya lo manda automáticamente en cada request
-(`js/api.js`) — si cambiás la key acá, actualizala también ahí.
+(proxy de Next.js) — si cambiás la key acá, actualizala también ahí.
 
 ---
 
@@ -214,13 +223,13 @@ desarrollo). El frontend ya lo manda automáticamente en cada request
 ```
 Frontend (fetch)
       ↓
-  Controller        → recibe el request, llama al Service
+  Endpoint ASP.NET Core → recibe el request, llama al Service
       ↓
   Service           → valida, aplica lógica de negocio
       ↓
   Repository        → ejecuta el SQL contra PostgreSQL
       ↓
-  ResponseHelper    → serializa la respuesta en JSON envelope
+  ApiEnvelope       → serializa la respuesta en JSON envelope
       ↓
 Frontend (muestra el resultado)
 ```
@@ -234,7 +243,7 @@ clientes
     └── vehiculos (1:N)
             └── presupuestos (1:N)
             │       └── detalle_presupuesto (1:N)
-            │       └── services (1:1 al aprobar) ⚡
+            │       └── services (al vincular el trabajo realizado)
             └── services (1:N)
                     └── detalle_service (1:N)
                     └── facturas (1:1) ⚡
