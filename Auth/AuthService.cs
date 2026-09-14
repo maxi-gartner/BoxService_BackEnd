@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -9,12 +10,14 @@ namespace BoxService_BackEnd.Auth;
 public sealed class AuthService(IOptions<AuthOptions> options)
 {
     private readonly AuthOptions _options = options.Value;
+    private readonly PasswordHasher<AuthUser> _passwordHasher = new();
 
     public AuthResult? Authenticate(string username, string password)
     {
         var user = _options.Users.FirstOrDefault(candidate =>
             string.Equals(candidate.Username, username, StringComparison.OrdinalIgnoreCase) &&
-            candidate.Password == password);
+            _passwordHasher.VerifyHashedPassword(candidate, candidate.PasswordHash, password)
+                is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded);
 
         if (user is null)
         {
@@ -25,8 +28,8 @@ public sealed class AuthService(IOptions<AuthOptions> options)
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Username),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("name", user.Username),
+            new Claim("role", user.Role),
         };
 
         var credentials = new SigningCredentials(

@@ -8,7 +8,6 @@ using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,6 +34,7 @@ builder.Services.AddSingleton<AuthService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -44,7 +44,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.Key)),
             ValidateLifetime = true,
-            RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+            NameClaimType = "name",
+            RoleClaimType = "role",
             ClockSkew = TimeSpan.FromSeconds(30),
         };
     });
@@ -124,9 +125,9 @@ app.Use(async (context, next) =>
         return;
     }
 
-    var isCatalogWrite = path.StartsWith("/api/catalogo", StringComparison.OrdinalIgnoreCase)
+    var isCatalogWrite = path.StartsWith("/catalog", StringComparison.OrdinalIgnoreCase)
         && !HttpMethods.IsGet(context.Request.Method);
-    var role = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    var role = context.User.FindFirst("role")?.Value;
     if (isCatalogWrite && role is not ("dueno" or "superadmin"))
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -181,7 +182,7 @@ app.MapPost("/auth/login", (LoginRequest request, AuthService authService) =>
 app.MapGet("/auth/me", (HttpContext context) => ApiEnvelope<object>.Ok(new
 {
     username = context.User.Identity?.Name,
-    role = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value,
+    role = context.User.FindFirst("role")?.Value,
 }));
 
 // ── Clientes ───────────────────────────────────────────────────────
@@ -229,207 +230,6 @@ app.MapPost("/clients", (ClientCreateRequest request, ClientService service) =>
         return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
     }
 }).RequireAuthorization();
-
-// ── Vehículos ──────────────────────────────────────────────────────
-app.MapGet("/api/vehiculos", (string? plate, [FromServices] VehicleService service) =>
-{
-    if (!string.IsNullOrWhiteSpace(plate))
-    {
-        var vehicle = service.FindByPlate(plate.Trim());
-        return vehicle is null
-            ? Results.Json(ApiEnvelope<object>.Fail(404, "Vehicle not found."), statusCode: StatusCodes.Status404NotFound)
-            : Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
-    }
-
-    return Results.Ok(ApiEnvelope<object>.Ok(service.List().Select(VehicleDto.FromModel)));
-});
-
-app.MapGet("/api/vehiculos/{id:int}", (int id, [FromServices] VehicleService service) =>
-{
-    var vehicle = service.GetById(id);
-    return vehicle is null
-        ? Results.Json(ApiEnvelope<object>.Fail(404, "Vehicle not found."), statusCode: StatusCodes.Status404NotFound)
-        : Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
-});
-
-app.MapPost("/api/vehiculos", (VehicleCreateRequest request, [FromServices] VehicleService service) =>
-{
-    try
-    {
-        return Results.Json(
-            ApiEnvelope<object>.Ok(VehicleDto.FromModel(service.Create(request))),
-            statusCode: StatusCodes.Status201Created);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
-    }
-    catch (InvalidOperationException ex)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
-    }
-});
-
-app.MapGet("/api/vehiculos/{id:int}/historial", (int id, [FromServices] VehicleService vehicleService, [FromServices] ServicesService servicesService) =>
-{
-    if (vehicleService.GetById(id) is null)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(404, "Vehicle not found."), statusCode: StatusCodes.Status404NotFound);
-    }
-
-    return Results.Ok(ApiEnvelope<object>.Ok(servicesService.GetByVehicleId(id)));
-});
-
-// ── Presupuestos ─────────────────────────────────────────────────
-app.MapGet("/api/budgets", (BudgetService service) =>
-    ApiEnvelope<object>.Ok(service.GetAll()));
-
-app.MapGet("/api/budgets/{id:int}", (int id, BudgetService service) =>
-{
-    var budget = service.GetById(id);
-    return budget is null
-        ? Results.Json(ApiEnvelope<object>.Fail(404, "Budget not found"), statusCode: StatusCodes.Status404NotFound)
-        : Results.Ok(ApiEnvelope<object>.Ok(budget));
-});
-
-app.MapPost("/api/budgets", (BudgetCreateRequest request, BudgetService service) =>
-{
-    var (ok, _, error, result) = service.Create(request);
-    return ok
-        ? Results.Json(ApiEnvelope<object>.Ok(result), statusCode: StatusCodes.Status201Created)
-        : Results.Json(ApiEnvelope<object>.Fail(400, error), statusCode: StatusCodes.Status400BadRequest);
-});
-
-app.MapPatch("/api/budgets/{id:int}", (int id, BudgetStatusRequest request, BudgetService service) =>
-{
-    var (ok, notFound, error, result) = service.UpdateStatus(id, request);
-    if (ok) return Results.Ok(ApiEnvelope<object>.Ok(result));
-
-    return Results.Json(
-        ApiEnvelope<object>.Fail(notFound ? 404 : 400, error),
-        statusCode: notFound ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
-});
-
-app.MapPut("/api/budgets/{id:int}/service", (int id, AssignServiceRequest request, BudgetService service) =>
-{
-    var (ok, notFound, error) = service.AssignService(id, request.ServiceId);
-    if (ok) return Results.Ok(ApiEnvelope<object>.Ok(new { message = "Budget linked to service" }));
-
-    return Results.Json(
-        ApiEnvelope<object>.Fail(notFound ? 404 : 400, error),
-        statusCode: notFound ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
-});
-
-// ── Facturas ──────────────────────────────────────────────────────
-app.MapGet("/api/invoices", (InvoiceService service) =>
-    ApiEnvelope<object>.Ok(service.GetAll()));
-
-app.MapGet("/api/invoices/{id:int}", (int id, InvoiceService service) =>
-{
-    var invoice = service.GetById(id);
-    return invoice is null
-        ? Results.Json(ApiEnvelope<object>.Fail(404, "Invoice not found"), statusCode: StatusCodes.Status404NotFound)
-        : Results.Ok(ApiEnvelope<object>.Ok(invoice));
-});
-
-app.MapPost("/api/invoices", (InvoiceCreateRequest request, InvoiceService service) =>
-{
-    var (ok, _, error, result) = service.Create(request);
-    return ok
-        ? Results.Json(ApiEnvelope<object>.Ok(result), statusCode: StatusCodes.Status201Created)
-        : Results.Json(ApiEnvelope<object>.Fail(400, error), statusCode: StatusCodes.Status400BadRequest);
-});
-
-app.MapPatch("/api/invoices/{id:int}", (int id, InvoiceStatusRequest request, InvoiceService service) =>
-{
-    var (ok, notFound, error, result) = service.UpdateStatus(id, request);
-    if (ok) return Results.Ok(ApiEnvelope<object>.Ok(result));
-
-    return Results.Json(
-        ApiEnvelope<object>.Fail(notFound ? 404 : 400, error),
-        statusCode: notFound ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
-});
-
-// ── Services ──────────────────────────────────────────────────────
-app.MapGet("/api/services", (ServicesService service) =>
-    ApiEnvelope<object>.Ok(service.GetAll()));
-
-app.MapGet("/api/services/{id:int}", (int id, ServicesService service) =>
-{
-    var item = service.GetById(id);
-    return item is null
-        ? Results.Json(ApiEnvelope<object>.Fail(404, "Service not found"), statusCode: StatusCodes.Status404NotFound)
-        : Results.Ok(ApiEnvelope<object>.Ok(item));
-});
-
-app.MapPost("/api/services", (ServiceCreateRequest request, ServicesService service) =>
-{
-    try
-    {
-        var created = service.Create(new Service
-        {
-            Date = request.Date,
-            Mileage = request.Mileage,
-            ServiceType = request.ServiceType,
-            Notes = request.Notes,
-            VehicleId = request.VehicleId,
-        });
-        return Results.Json(ApiEnvelope<object>.Ok(created), statusCode: StatusCodes.Status201Created);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
-    }
-});
-
-app.MapGet("/api/services/{id:int}/details", (int id, ServicesService service) =>
-    ApiEnvelope<object>.Ok(service.GetDetails(id)));
-
-app.MapPost("/api/services/{id:int}/details", (int id, ServiceDetail request, ServicesService service) =>
-{
-    request.ServiceId = id;
-    try
-    {
-        return Results.Json(ApiEnvelope<object>.Ok(service.CreateDetail(request)), statusCode: StatusCodes.Status201Created);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
-    }
-});
-
-// ── Catálogo ──────────────────────────────────────────────────────
-app.MapGet("/api/catalogo", (CatalogService service) =>
-    ApiEnvelope<object>.Ok(service.GetAll()));
-
-app.MapPost("/api/catalogo", (CatalogItemCreateRequest request, CatalogService service) =>
-{
-    try
-    {
-        return Results.Json(ApiEnvelope<object>.Ok(service.Create(request)), statusCode: StatusCodes.Status201Created);
-    }
-    catch (ArgumentException ex)
-    {
-        return Results.Json(ApiEnvelope<object>.Fail(400, ex.Message), statusCode: StatusCodes.Status400BadRequest);
-    }
-});
-
-app.MapPatch("/api/catalogo/{id:int}", (int id, CatalogItemUpdateRequest request, CatalogService service) =>
-{
-    var (ok, notFound, error) = service.Update(id, request);
-    if (ok) return Results.Ok(ApiEnvelope<object>.Ok(new { message = "Catalog item updated" }));
-
-    return Results.Json(
-        ApiEnvelope<object>.Fail(notFound ? 404 : 400, error),
-        statusCode: notFound ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
-});
-
-app.MapDelete("/api/catalogo/{id:int}", (int id, CatalogService service) =>
-{
-    return service.Delete(id)
-        ? Results.Ok(ApiEnvelope<object>.Ok(new { message = "Catalog item deleted" }))
-        : Results.Json(ApiEnvelope<object>.Fail(404, "Catalog item not found"), statusCode: StatusCodes.Status404NotFound);
-});
 
 app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();

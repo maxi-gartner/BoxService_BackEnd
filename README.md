@@ -116,8 +116,8 @@ Content-Type: application/json
 Los roles disponibles en la configuración de desarrollo son `dueno`, `superadmin` y `empleado`.
 El rol `empleado` puede operar la aplicación, pero no modificar el catálogo; dueño y superadmin
 pueden hacerlo. Cambiá `Jwt:Key` y las credenciales de `Jwt:Users` antes de exponer el backend.
-Estas cuentas están configuradas en `appsettings.json` solo como mecanismo inicial de desarrollo;
-la siguiente evolución debería persistir usuarios y contraseñas con hash en PostgreSQL.
+Las contraseñas se almacenan como hashes `PasswordHasher` en la configuración; el siguiente paso
+de producción debería persistir usuarios y hashes en PostgreSQL.
 
 ### 1. Clonar el repositorio
 
