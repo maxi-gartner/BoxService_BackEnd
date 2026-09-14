@@ -1,10 +1,24 @@
+using System.Text;
 using BoxService_BackEnd.Api;
+using BoxService_BackEnd.Auth;
 using BoxService_BackEnd.Data;
 using BoxService_BackEnd.Database;
 using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+
+// ── Utilidad de desarrollo: generar el hash de una contraseña para pegar
+// en appsettings.json (sección Jwt:Users). No levanta el servidor.
+// Uso: dotnet run -- hash-password "la-contraseña"
+if (args.Length == 2 && args[0] == "hash-password")
+{
+    Console.WriteLine(new PasswordHasher<object>().HashPassword(new object(), args[1]));
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
@@ -27,6 +41,46 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
+// ── Autenticación (JWT) ────────────────────────────────────────────
+// Reemplaza el X-Api-Key compartido: ahora cada usuario tiene su propio
+// login (appsettings.json → Jwt:Users) y token, con rol incluido en el
+// claim. La lista de usuarios sigue siendo config estática (no hay tabla
+// de usuarios en la base todavía) — alcanza para lo que pide el TP.
+var authOptions = builder.Configuration.GetSection("Jwt").Get<AuthOptions>()
+    ?? throw new InvalidOperationException("No hay configuración Jwt (ver appsettings.example.json).");
+
+if (string.IsNullOrWhiteSpace(authOptions.Key) || Encoding.UTF8.GetByteCount(authOptions.Key) < 32)
+{
+    throw new InvalidOperationException("Jwt:Key debe tener al menos 32 bytes.");
+}
+
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddSingleton<AuthService>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // MapInboundClaims = false: sin esto, ASP.NET Core remapea algunos
+        // nombres de claim conocidos a las URIs largas de ClaimTypes al
+        // leer el token — con "role"/"name" en el JWT (ver AuthService.cs)
+        // eso dejaría el claim con un .Type distinto al que se buscó al
+        // escribirlo. Mejor que quede tal cual el token, sin sorpresas.
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = authOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = authOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.Key)),
+            ValidateLifetime = true,
+            RoleClaimType = "role",
+            NameClaimType = "name",
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<PostgresConnectionFactory>();
 
@@ -56,17 +110,6 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("No hay connection string configurada.");
 DatabaseConnection.Configure(connectionString);
 
-// ── API Key ────────────────────────────────────────────────────────
-// Mismo esquema que el backend viejo: header X-Api-Key obligatorio en
-// todo menos "/" y "/health". Se cayó al migrar a ASP.NET Core — esto lo
-// vuelve a dejar como estaba, no es un mecanismo nuevo.
-const string DefaultApiKey = "boxservice-dev-key";
-var apiKey = builder.Configuration["ApiKey"] ?? DefaultApiKey;
-if (apiKey == DefaultApiKey)
-{
-    Console.WriteLine("[AVISO] Usando la API key por defecto de desarrollo. No la uses en un servidor expuesto a internet.");
-}
-
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -88,27 +131,53 @@ app.UseStatusCodePages(async statusContext =>
         response.StatusCode == 404 ? "Route not found." : "Invalid request."));
 });
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+// ── Autenticación / autorización ──────────────────────────────────
+// Reemplaza el X-Api-Key: todo lo que no sea "/", "/health" o
+// "/auth/login" exige un Bearer token válido (ver Auth/AuthService.cs).
+// Además, escribir en el catálogo (POST/PATCH/DELETE) queda restringido
+// a dueño/superadmin — es el único permiso por rol que pidió el TP hasta
+// ahora; el resto de los módulos solo pide estar logueado.
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
-    var isPublicRoute = path == "" || path.StartsWith("/health");
+    var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login";
 
-    if (!isPublicRoute)
+    if (!isPublicRoute && context.User.Identity?.IsAuthenticated != true)
     {
-        var providedKey = context.Request.Headers["X-Api-Key"].ToString();
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(401, "Missing or invalid bearer token."));
+        return;
+    }
 
-        if (string.IsNullOrEmpty(providedKey) || providedKey != apiKey)
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(
-                ApiEnvelope<object>.Fail(401, "Missing or invalid API key.")
-            );
-            return;
-        }
+    var isCatalogWrite = path.StartsWith("/catalog", StringComparison.OrdinalIgnoreCase)
+        && !HttpMethods.IsGet(context.Request.Method);
+    var role = context.User.FindFirst("role")?.Value;
+    if (isCatalogWrite && role is not ("dueno" or "superadmin"))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "No tenés permisos para modificar el catálogo."));
+        return;
     }
 
     await next();
 });
+
+app.MapPost("/auth/login", (LoginRequest request, AuthService authService) =>
+{
+    var result = authService.Authenticate(request.Username, request.Password);
+    return result is null
+        ? Results.Json(ApiEnvelope<object>.Fail(401, "Usuario o contraseña inválidos."), statusCode: StatusCodes.Status401Unauthorized)
+        : Results.Ok(ApiEnvelope<object>.Ok(result));
+});
+
+app.MapGet("/auth/me", (HttpContext context) => ApiEnvelope<object>.Ok(new
+{
+    username = context.User.Identity?.Name,
+    role = context.User.FindFirst("role")?.Value,
+}));
 
 app.MapGet("/", () => ApiEnvelope<object>.Ok(new
 {

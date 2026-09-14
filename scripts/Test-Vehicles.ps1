@@ -1,19 +1,26 @@
 param(
     [string]$BaseUrl = 'http://localhost:5001',
-    [string]$ApiKey = $env:BOXSERVICE_API_KEY
+    [string]$Username = $(if ($env:BOXSERVICE_USERNAME) { $env:BOXSERVICE_USERNAME } else { 'superadmin' }),
+    [string]$Password = $(if ($env:BOXSERVICE_PASSWORD) { $env:BOXSERVICE_PASSWORD } else { 'boxservice123' })
 )
 
 $ErrorActionPreference = 'Stop'
-if ([string]::IsNullOrWhiteSpace($ApiKey)) { $ApiKey = 'boxservice-dev-key' }
 $http = [System.Net.Http.HttpClient]::new()
 $http.Timeout = [TimeSpan]::FromSeconds(25)
 $script:failures = 0
+
+$loginBody = [System.Net.Http.StringContent]::new(
+    (@{ username = $Username; password = $Password } | ConvertTo-Json), [Text.Encoding]::UTF8, 'application/json')
+$loginResponse = $http.PostAsync($BaseUrl.TrimEnd('/') + '/auth/login', $loginBody).GetAwaiter().GetResult()
+$loginJson = $loginResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+if (-not $loginJson.success) { throw "No se pudo loguear como '$Username': $($loginJson.error.message)" }
+$script:token = $loginJson.data.token
 
 function Test-Response {
     param([string]$Method, [string]$Path, [int]$ExpectedStatus, [string]$Body, [switch]$NoKey)
     $request = [System.Net.Http.HttpRequestMessage]::new(
         [System.Net.Http.HttpMethod]::new($Method), $BaseUrl.TrimEnd('/') + $Path)
-    if (-not $NoKey) { $request.Headers.Add('X-Api-Key', $ApiKey) }
+    if (-not $NoKey) { $request.Headers.Add('Authorization', "Bearer $script:token") }
     if ($PSBoundParameters.ContainsKey('Body')) {
         $request.Content = [System.Net.Http.StringContent]::new($Body, [System.Text.Encoding]::UTF8, 'application/json')
     }

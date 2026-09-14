@@ -1,4 +1,8 @@
-param([string]$BaseUrl = 'http://localhost:5001')
+param(
+    [string]$BaseUrl = 'http://localhost:5001',
+    [string]$Username = 'superadmin',
+    [string]$Password = 'boxservice123'
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -11,8 +15,12 @@ $logging = Get-ChildItem (Join-Path $dotnetRoot 'shared/Microsoft.AspNetCore.App
 $connection = [Npgsql.NpgsqlConnection]::new($config.ConnectionStrings.DefaultConnection)
 $http = [System.Net.Http.HttpClient]::new()
 $http.Timeout = [TimeSpan]::FromSeconds(40)
-$key = if ($config.ApiKey) { $config.ApiKey } else { 'boxservice-dev-key' }
-$http.DefaultRequestHeaders.Add('X-Api-Key', $key)
+$loginBody = [System.Net.Http.StringContent]::new(
+    (@{ username = $Username; password = $Password } | ConvertTo-Json), [Text.Encoding]::UTF8, 'application/json')
+$loginResponse = $http.PostAsync("$BaseUrl/auth/login", $loginBody).GetAwaiter().GetResult()
+$loginJson = $loginResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+if (-not $loginJson.success) { throw "No se pudo loguear como '$Username': $($loginJson.error.message)" }
+$http.DefaultRequestHeaders.Add('Authorization', "Bearer $($loginJson.data.token)")
 $marker = 'CodexTest-' + [Guid]::NewGuid().ToString('N')
 $plate = 'T' + [Guid]::NewGuid().ToString('N').Substring(0, 9).ToUpperInvariant()
 $clientId = $null

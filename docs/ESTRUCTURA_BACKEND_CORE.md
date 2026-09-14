@@ -41,21 +41,23 @@ El proyecto arranca con ASP.NET Core y expone:
 
 - `GET /`
 - `GET /health` (público, usa `PostgresConnectionFactory` para verificar conexión real a PostgreSQL)
+- `POST /auth/login` (público) · `GET /auth/me` — login JWT, ver `Auth/AuthService.cs`
 - `GET /clients` · `GET /clients/{id}` · `GET /clients/{id}/vehicles` · `POST /clients`
-  (requieren `X-Api-Key` — primer módulo migrado de punta a punta)
+  (primer módulo migrado de punta a punta)
 
-Todo lo que no sea `/` o `/health` exige el header `X-Api-Key`, igual que en
-el backend viejo (`Server.cs`) — se había perdido al migrar y se restauró
-como middleware en `Program.cs`.
+Todo lo que no sea `/`, `/health` o `/auth/login` exige un JWT válido en
+`Authorization: Bearer <token>` — reemplaza el `X-Api-Key` compartido que
+había antes (ver sección Autenticación del README). Además, escribir en
+`/catalog` (`POST`/`PATCH`/`DELETE`) exige rol `dueno` o `superadmin`.
 
 - `GET /vehicles` (filtro opcional `?plate=`), `GET /vehicles/{id}`,
   `GET /vehicles/{id}/history`, `POST /vehicles`: entrada ASP.NET Core en
   `Api/VehicleEndpoints.cs`, registrada desde `Program.cs`.
   El historial usa `ServiceDto` y conserva las consultas del servicio existente.
 
-Todos los módulos todavía usan el tenant provisional de `ClientDto` y API key.
-Esto no implementa aislamiento multi-tenant: queda pendiente integrar JWT y
-filtros de tenant con el trabajo de autenticación.
+Todos los módulos todavía usan el tenant provisional de `ClientDto`. Los
+usuarios de `Jwt:Users` tampoco tienen tenant asociado — el aislamiento
+multi-tenant real (cada taller viendo solo sus datos) sigue pendiente.
 
 Para activar los módulos en el frontend, agregar `vehicles`, `budgets`,
 `services`, `invoices` y `catalog` a
@@ -64,8 +66,9 @@ Para activar los módulos en el frontend, agregar `vehicles`, `budgets`,
 ### Verificación de Vehículos
 
 Con el backend iniciado, ejecutar `./scripts/Test-Vehicles.ps1` desde PowerShell.
-Se puede indicar `-BaseUrl` y configurar `BOXSERVICE_API_KEY` para una API key
-distinta de la de desarrollo. El script verifica envelope, autenticación,
+Se puede indicar `-BaseUrl`, `-Username`/`-Password` (o las variables de entorno
+`BOXSERVICE_USERNAME`/`BOXSERVICE_PASSWORD`) para loguearse con una cuenta
+distinta de `superadmin`. El script verifica envelope, autenticación,
 validaciones, métodos no permitidos y consultas. No inserta ni elimina datos.
 Si `/health` falla, omite las consultas y termina con error para no confundir
 la validación HTTP con una prueba completa de integración.
