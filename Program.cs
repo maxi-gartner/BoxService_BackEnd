@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
+    options.ThrowOnBadRequest = false);
 
 builder.WebHost.UseUrls("http://localhost:5001");
 
@@ -101,6 +103,14 @@ app.UseExceptionHandler(errorApp =>
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseStatusCodePages(async statusContext =>
+{
+    var response = statusContext.HttpContext.Response;
+    await response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(
+        response.StatusCode,
+        response.StatusCode == 404 ? "Route not found." : "Invalid request."));
+});
 
 app.Use(async (context, next) =>
 {
@@ -420,5 +430,11 @@ app.MapDelete("/api/catalogo/{id:int}", (int id, CatalogService service) =>
         ? Results.Ok(ApiEnvelope<object>.Ok(new { message = "Catalog item deleted" }))
         : Results.Json(ApiEnvelope<object>.Fail(404, "Catalog item not found"), statusCode: StatusCodes.Status404NotFound);
 });
+
+app.MapVehicleEndpoints();
+app.MapBudgetEndpoints();
+app.MapServiceEndpoints();
+app.MapInvoiceEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();

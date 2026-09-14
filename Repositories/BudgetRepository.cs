@@ -96,7 +96,25 @@ namespace BoxService_BackEnd.Repositories
         public int Create(Budget b)
         {
             using var conn = DatabaseConnection.GetConnection();
+            return Create(b, conn, null);
+        }
 
+        public int CreateWithDetails(Budget budget, List<BudgetDetail> details)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var tx = conn.BeginTransaction();
+            var id = Create(budget, conn, tx);
+            foreach (var detail in details)
+            {
+                detail.BudgetId = id;
+                CreateDetail(detail, conn, tx);
+            }
+            tx.Commit();
+            return id;
+        }
+
+        private static int Create(Budget b, NpgsqlConnection conn, NpgsqlTransaction? tx)
+        {
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO presupuestos (
                     numero,
@@ -112,7 +130,7 @@ namespace BoxService_BackEnd.Repositories
                     @observaciones,
                     @id_vehiculo
                 )
-                RETURNING id_presupuesto", conn);
+                RETURNING id_presupuesto", conn, tx);
 
             cmd.Parameters.AddWithValue("numero", b.Number);
             cmd.Parameters.AddWithValue("fecha", DateTime.Today);
