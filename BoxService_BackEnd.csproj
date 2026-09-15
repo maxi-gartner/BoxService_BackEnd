@@ -14,8 +14,6 @@
     <Folder Include="Services\" />
     <Folder Include="Repositories\" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
-
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
     <PackageReference Include="Npgsql" Version="10.0.2" />
   </ItemGroup>
 
