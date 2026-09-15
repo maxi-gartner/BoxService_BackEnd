@@ -1,4 +1,8 @@
-param([string]$BaseUrl = 'http://localhost:5001')
+param(
+    [string]$BaseUrl = 'http://localhost:5001',
+    [string]$Username = 'superadmin',
+    [string]$Password = 'boxservice123'
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -11,7 +15,12 @@ $logging = Get-ChildItem (Join-Path $dotnetRoot 'shared/Microsoft.AspNetCore.App
 $connection = [Npgsql.NpgsqlConnection]::new($config.ConnectionStrings.DefaultConnection)
 $http = [System.Net.Http.HttpClient]::new()
 $http.Timeout = [TimeSpan]::FromSeconds(90)
-$key = if ($config.ApiKey) { $config.ApiKey } else { 'boxservice-dev-key' }
+$loginBody = [System.Net.Http.StringContent]::new(
+    (@{ username = $Username; password = $Password } | ConvertTo-Json), [Text.Encoding]::UTF8, 'application/json')
+$loginResponse = $http.PostAsync("$BaseUrl/auth/login", $loginBody).GetAwaiter().GetResult()
+$loginJson = $loginResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+if (-not $loginJson.success) { throw "No se pudo loguear como '$Username': $($loginJson.error.message)" }
+$token = $loginJson.data.token
 $marker = 'CodexModules-' + [Guid]::NewGuid().ToString('N')
 $clientId = $null
 $script:passed = 0
@@ -22,7 +31,7 @@ function Assert($condition, [string]$message) {
 
 function Request([string]$method, [string]$path, [int]$expected, $body = $null, [switch]$NoKey, [switch]$Raw) {
     $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($method), $BaseUrl + $path)
-    if (-not $NoKey) { $request.Headers.Add('X-Api-Key', $key) }
+    if (-not $NoKey) { $request.Headers.Add('Authorization', "Bearer $token") }
     if ($null -ne $body) {
         $text = if ($Raw) { [string]$body } else { $body | ConvertTo-Json -Depth 8 }
         $request.Content = [System.Net.Http.StringContent]::new($text, [Text.Encoding]::UTF8, 'application/json')

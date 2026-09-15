@@ -11,7 +11,7 @@ Sistema de gestión para lubricentros y talleres mecánicos
 # BoxService — Backend
 
 > API REST para el sistema de gestión de lubricentro.
-> Módulos funcionales en ASP.NET Core + PostgreSQL. Auth/JWT y multi-tenant pendientes.
+> Módulos funcionales en ASP.NET Core + PostgreSQL, con login JWT. Multi-tenant real pendiente.
 
 ---
 
@@ -188,7 +188,7 @@ Respuesta esperada:
 
 ## Endpoints disponibles
 
-Todas las rutas excepto `/` y `/health` requieren el header `X-Api-Key`
+Todas las rutas excepto `/`, `/health` y `/auth/login` requieren un JWT
 (ver [Autenticación](#autenticación) más abajo). La API nueva usa nombres
 en inglés, sin prefijo `/api`. Los alias del servidor HttpListener anterior
 no están registrados en el pipeline nuevo. Consultar la lista actual en
@@ -196,7 +196,9 @@ no están registrados en el pipeline nuevo. Consultar la lista actual en
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/health` | Estado del servidor y la base de datos (no requiere API key) |
+| GET | `/health` | Estado del servidor y la base de datos (pública) |
+| POST | `/auth/login` | Login — devuelve el JWT (pública) |
+| GET | `/auth/me` | Usuario y rol del token actual |
 | GET | `/clients` | Lista todos los clientes |
 | GET | `/clients/{id}` | Obtiene un cliente por ID |
 | GET | `/clients/{id}/vehicles` | Lista los vehículos de un cliente |
@@ -233,11 +235,41 @@ no están registrados en el pipeline nuevo. Consultar la lista actual en
 
 ### Autenticación
 
-Un candado simple, no un sistema de auth completo: todas las rutas de
-negocio requieren el header `X-Api-Key` con el valor configurado en
-`appsettings.json` (campo `ApiKey`, por defecto `boxservice-dev-key` en
-desarrollo). El frontend ya lo manda automáticamente en cada request
-(proxy de Next.js) — si cambiás la key acá, actualizala también ahí.
+Login con JWT (`Auth/AuthService.cs`). Los usuarios son una lista fija en
+`appsettings.json` (sección `Jwt:Users`) — no hay tabla de usuarios en la
+base todavía, eso queda para cuando se arme multi-tenant de verdad.
+
+```http
+POST http://localhost:5001/auth/login
+Content-Type: application/json
+
+{ "username": "empleado", "password": "cambiar-esta-clave" }
+```
+
+Devuelve `{ token, expiresAt, username, role }`. Para el resto de las
+rutas, mandar el token en el header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Cuentas de desarrollo (`appsettings.example.json`): `dueno` / `superadmin`
+(`boxservice123`) / `empleado` — todas con contraseña `cambiar-esta-clave`
+salvo `superadmin`. Las contraseñas se guardan **hasheadas** (con
+`PasswordHasher` de ASP.NET Core Identity, no en texto plano). Para generar
+el hash de una contraseña nueva y pegarlo en `Jwt:Users`:
+
+```powershell
+dotnet run -- hash-password "la-contraseña-nueva"
+```
+
+Por ahora el único permiso por rol implementado es: escribir en el
+catálogo (`POST`/`PATCH`/`DELETE /catalog/...`) requiere rol `dueno` o
+`superadmin` — `empleado` solo puede leerlo. El resto de los endpoints
+solo pide estar logueado, sin distinguir rol todavía.
+
+El frontend ya manda el `Authorization: Bearer` en cada request (proxy de
+Next.js) una vez que el usuario hace login.
 
 ---
 
