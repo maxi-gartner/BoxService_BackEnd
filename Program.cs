@@ -41,11 +41,13 @@ if (args.Length > 0 && args[0] == "migrate")
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = false);
 
-// Local: localhost:5001, como siempre. Render (y cualquier PaaS similar)
-// inyecta un puerto dinámico vía PORT y espera que la app escuche en
-// 0.0.0.0, no en localhost — si no, el health check nunca la encuentra.
-var httpPort = Environment.GetEnvironmentVariable("PORT") ?? "5001";
-builder.WebHost.UseUrls($"http://0.0.0.0:{httpPort}");
+// PORT solo la setea Render (u otro PaaS similar) — si está, escuchamos en
+// 0.0.0.0:$PORT porque el health check le pega desde afuera del contenedor.
+// Sin PORT (dev local) seguimos en localhost:5001 como siempre: bindear
+// 0.0.0.0 en Windows dispara el prompt del Firewall en cada arranque, y en
+// máquinas de laburo con permisos restringidos ni se puede aceptar.
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+builder.WebHost.UseUrls(renderPort is not null ? $"http://0.0.0.0:{renderPort}" : "http://localhost:5001");
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
