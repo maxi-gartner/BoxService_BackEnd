@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using BoxService_BackEnd.Auth;
 using BoxService_BackEnd.Api;
 using BoxService_BackEnd.Data;
@@ -11,6 +12,17 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// dotnet run -- hash-password "la-contraseña": imprime el hash para pegar
+// en Jwt:Users (local) o cargar como Jwt__Users__N__PasswordHash (Render).
+// No levanta el servidor. El README la documentaba pero se había perdido
+// en un merge — el setup de secretos de Render la necesita para generar
+// los 3 hashes de las cuentas demo.
+if (args.Length == 2 && args[0] == "hash-password")
+{
+    Console.WriteLine(new PasswordHasher<AuthUser>().HashPassword(new AuthUser(), args[1]));
+    return;
+}
 
 // dotnet run -- migrate: aplica Database/migrations/*.sql contra la base de
 // appsettings.json y termina, sin levantar el servidor web. Cada archivo usa
@@ -29,7 +41,11 @@ if (args.Length > 0 && args[0] == "migrate")
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = false);
 
-builder.WebHost.UseUrls("http://localhost:5001");
+// Local: localhost:5001, como siempre. Render (y cualquier PaaS similar)
+// inyecta un puerto dinámico vía PORT y espera que la app escuche en
+// 0.0.0.0, no en localhost — si no, el health check nunca la encuentra.
+var httpPort = Environment.GetEnvironmentVariable("PORT") ?? "5001";
+builder.WebHost.UseUrls($"http://0.0.0.0:{httpPort}");
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -66,14 +82,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+// Cors:AllowedOrigin (env var Cors__AllowedOrigin) restringe el origen una
+// vez que hay un frontend público real que proteger (Vercel). Sin setear,
+// sigue permitiendo cualquier origen — no rompe nada en desarrollo local.
+var allowedOrigin = builder.Configuration["Cors:AllowedOrigin"];
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        if (string.IsNullOrWhiteSpace(allowedOrigin))
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigin).AllowAnyHeader().AllowAnyMethod();
+        }
     });
 });
 
