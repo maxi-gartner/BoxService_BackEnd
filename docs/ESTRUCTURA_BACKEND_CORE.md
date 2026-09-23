@@ -75,7 +75,7 @@ la validación HTTP con una prueba completa de integración.
 
 Para probar escrituras, `./scripts/Test-VehicleCreation.ps1` crea un cliente
 temporal, realiza el alta HTTP y elimina los registros propios al terminar.
-Requiere PowerShell 7, el build Debug net8.0, `appsettings.json` local y acceso
+Requiere PowerShell 7, el build Debug net10.0, `appsettings.json` local y acceso
 a PostgreSQL. Ejecutarlo solo contra una base donde se permitan datos de prueba.
 Verifica alta (`201`), persistencia, historial vacío, asociación al cliente,
 patente duplicada e identificador de cliente inexistente (`400`).

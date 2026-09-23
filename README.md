@@ -49,7 +49,7 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 
 | Capa | Tecnología |
 |---|---|
-| Lenguaje | C# .NET 8 |
+| Lenguaje | C# .NET 10 |
 | Servidor HTTP | ASP.NET Core |
 | Base de datos | PostgreSQL |
 | Driver BD | Npgsql |
@@ -88,7 +88,7 @@ BoxService-BackEnd/
 
 ## Requisitos previos
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL](https://www.postgresql.org/download/) corriendo en `localhost:5432`
 - Visual Studio Community 2022
 
