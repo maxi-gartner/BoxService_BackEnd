@@ -49,7 +49,7 @@ Cliente → Vehículo → Presupuesto → Service → Factura
 
 | Capa | Tecnología |
 |---|---|
-| Lenguaje | C# .NET 8 |
+| Lenguaje | C# .NET 10 |
 | Servidor HTTP | ASP.NET Core |
 | Base de datos | PostgreSQL |
 | Driver BD | Npgsql |
@@ -88,7 +88,7 @@ BoxService-BackEnd/
 
 ## Requisitos previos
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL](https://www.postgresql.org/download/) corriendo en `localhost:5432`
 - Visual Studio Community 2022
 
@@ -137,21 +137,18 @@ Desde pgAdmin o psql:
 CREATE DATABASE boxservice;
 ```
 
-### 4. Ejecutar las migraciones en orden
-
-Abrir cada archivo en `Database/migrations/` y ejecutarlos en este orden:
+### 4. Ejecutar las migraciones
 
 ```
-001_crear_clientes.sql
-002_crear_vehiculos.sql
-003_crear_presupuestos.sql
-004_crear_services.sql
-005_crear_facturas.sql
-006_add_id_presupuesto_to_services.sql
-007_add_numero_sequences.sql
-008_crear_catalogo_servicios.sql
-009_vehicle_year_nullable.sql
+dotnet run -- migrate
 ```
+
+Corre todo `Database/migrations/*.sql` en orden contra la base de
+`appsettings.json` y termina (no levanta el servidor web). Cada migración usa
+`IF NOT EXISTS` (o el equivalente para constraints), así que correrlo de
+nuevo sobre una base que ya las tiene aplicadas no rompe nada — se saltean
+sin error. Alternativa manual: abrir cada archivo de `Database/migrations/`
+y ejecutarlo en orden numérico desde psql/pgAdmin.
 
 ### 5. Correr el proyecto
 
@@ -311,7 +308,11 @@ clientes
 - Nunca trabajar directo en `main` — cada uno trabaja en su rama `feature/[modulo]`
 - Nunca poner lógica de negocio en los Controllers
 - Nunca acceder a la BD desde Services — solo desde Repositories
-- Nunca editar una migración ya aplicada — crear una nueva
+- Nunca editar una migración ya aplicada — crear una nueva. Única excepción:
+  un fix de idempotencia que no cambia el resultado final (ver 004,
+  `ADD CONSTRAINT` sin guard rompía `dotnet run -- migrate` en una base que
+  ya la tenía aplicada) — si el cambio altera qué termina en la base, va en
+  una migración nueva, no editando la vieja.
 
 Más detalle:
 

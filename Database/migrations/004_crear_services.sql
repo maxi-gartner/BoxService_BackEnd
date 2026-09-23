@@ -20,6 +20,18 @@ CREATE TABLE IF NOT EXISTS detalle_service (
 );
 
 -- FK que cierra el ciclo presupuesto → service
-ALTER TABLE presupuestos
-    ADD CONSTRAINT fk_presupuesto_service
-    FOREIGN KEY (id_service) REFERENCES services(id_service);
+-- Postgres no soporta "ADD CONSTRAINT IF NOT EXISTS" (sí existe para ADD
+-- COLUMN, pero no para constraints) — sin este chequeo manual, re-correr las
+-- migraciones sobre una base que ya las tiene aplicadas (ej. "dotnet run --
+-- migrate" ejecutado más de una vez) fallaba acá, aunque el resultado final
+-- fuera el mismo.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_presupuesto_service'
+    ) THEN
+        ALTER TABLE presupuestos
+            ADD CONSTRAINT fk_presupuesto_service
+            FOREIGN KEY (id_service) REFERENCES services(id_service);
+    END IF;
+END $$;

@@ -11,6 +11,21 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// dotnet run -- migrate: aplica Database/migrations/*.sql contra la base de
+// appsettings.json y termina, sin levantar el servidor web. Cada archivo usa
+// CREATE TABLE/INDEX IF NOT EXISTS (o ALTER ... IF NOT EXISTS), así que
+// correrlo de nuevo sobre una base que ya tiene las tablas no rompe nada:
+// las migraciones ya aplicadas se saltean sin error.
+if (args.Length > 0 && args[0] == "migrate")
+{
+    var migrateConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? Environment.GetEnvironmentVariable("BOXSERVICE_CONNECTION_STRING")
+        ?? throw new InvalidOperationException("No hay connection string configurada.");
+    await DatabaseSetup.SetupAsync(migrateConnectionString);
+    return;
+}
+
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = false);
 
