@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using BoxService_BackEnd.Auth;
 using BoxService_BackEnd.Api;
 using BoxService_BackEnd.Data;
@@ -11,6 +12,17 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// dotnet run -- hash-password "la-contraseña": imprime el hash para pegar
+// en Jwt:Users (local) o cargar como Jwt__Users__N__PasswordHash (Render).
+// No levanta el servidor. El README la documentaba pero se había perdido
+// en un merge — el setup de secretos de Render la necesita para generar
+// los 3 hashes de las cuentas demo.
+if (args.Length == 2 && args[0] == "hash-password")
+{
+    Console.WriteLine(new PasswordHasher<AuthUser>().HashPassword(new AuthUser(), args[1]));
+    return;
+}
 
 // dotnet run -- migrate: aplica Database/migrations/*.sql contra la base de
 // appsettings.json y termina, sin levantar el servidor web. Cada archivo usa
@@ -29,7 +41,13 @@ if (args.Length > 0 && args[0] == "migrate")
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = false);
 
-builder.WebHost.UseUrls("http://localhost:5001");
+// PORT solo la setea Render (u otro PaaS similar) — si está, escuchamos en
+// 0.0.0.0:$PORT porque el health check le pega desde afuera del contenedor.
+// Sin PORT (dev local) seguimos en localhost:5001 como siempre: bindear
+// 0.0.0.0 en Windows dispara el prompt del Firewall en cada arranque, y en
+// máquinas de laburo con permisos restringidos ni se puede aceptar.
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+builder.WebHost.UseUrls(renderPort is not null ? $"http://0.0.0.0:{renderPort}" : "http://localhost:5001");
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -66,14 +84,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+// Cors:AllowedOrigin (env var Cors__AllowedOrigin) restringe el origen una
+// vez que hay un frontend público real que proteger (Vercel). Sin setear,
+// sigue permitiendo cualquier origen — no rompe nada en desarrollo local.
+var allowedOrigin = builder.Configuration["Cors:AllowedOrigin"];
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        if (string.IsNullOrWhiteSpace(allowedOrigin))
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigin).AllowAnyHeader().AllowAnyMethod();
+        }
     });
 });
 
@@ -87,10 +113,16 @@ builder.Services.AddScoped<ClientRepository>();
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<VehicleService>();
+builder.Services.AddScoped<BudgetRepository>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<ServicesService>();
 builder.Services.AddScoped<CatalogService>();
+
+// ── Portal del cliente (login con Google, ver estado del vehículo) ───
+builder.Services.AddScoped<PortalAccessRepository>();
+builder.Services.AddScoped<PortalService>();
+builder.Services.AddScoped<PortalAuthService>();
 
 var app = builder.Build();
 
@@ -131,7 +163,8 @@ app.UseStatusCodePages(async statusContext =>
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
-    var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login";
+    var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login"
+        || path == "/portal/auth/google";
 
     if (!isPublicRoute && context.User.Identity?.IsAuthenticated != true)
     {
@@ -148,6 +181,30 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "No tenés permisos para modificar el catálogo."));
         return;
+    }
+
+    // El portal del cliente (role "customer") es un mundo aparte del
+    // staff: solo puede pisar /portal/*, y nada del staff puede pisar
+    // /portal/* salvo que sea "customer". Sin esto, cualquier JWT
+    // autenticado (de cualquier lado) entraría a todo lo demás, porque
+    // el resto de las rutas de acá arriba solo chequean IsAuthenticated.
+    var isPortalRoute = path.StartsWith("/portal", StringComparison.OrdinalIgnoreCase)
+        && path != "/portal/auth/google";
+    if (!isPublicRoute)
+    {
+        if (isPortalRoute && role != "customer")
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para el portal del cliente."));
+            return;
+        }
+
+        if (!isPortalRoute && role == "customer")
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para el equipo del taller."));
+            return;
+        }
     }
 
     await next();
@@ -251,5 +308,6 @@ app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
+app.MapPortalEndpoints();
 
 app.Run();

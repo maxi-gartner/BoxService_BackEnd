@@ -13,6 +13,7 @@
     <Folder Include="Models\" />
     <Folder Include="Services\" />
     <Folder Include="Repositories\" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.77.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>

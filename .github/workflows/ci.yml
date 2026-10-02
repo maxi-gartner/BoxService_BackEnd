@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      # No corre la imagen ni toca ninguna base — solo confirma que el
+      # Dockerfile que Render va a usar para el deploy real compila.
+      - name: Docker build (smoke test)
+        run: docker build -t boxservice-backend:ci .
