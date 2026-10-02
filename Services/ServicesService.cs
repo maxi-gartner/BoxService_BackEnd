@@ -82,14 +82,14 @@ namespace BoxService_BackEnd.Services
         // Esto evita guardar valores con espacios de m�s.
         private static void Sanitize(Service service)
         {
-            service.ServiceType = service.ServiceType?.Trim();
-            service.Notes = service.Notes?.Trim();
+            service.ServiceType = service.ServiceType?.Trim() ?? "";
+            service.Notes = service.Notes?.Trim() ?? "";
         }
 
         // Limpieza de textos del detalle.
         private static void SanitizeDetail(ServiceDetail detail)
         {
-            detail.Description = detail.Description?.Trim();
+            detail.Description = detail.Description?.Trim() ?? "";
         }
 
         // Validaciones principales del service.
@@ -100,6 +100,11 @@ namespace BoxService_BackEnd.Services
             // La fecha es obligatoria.
             if (service.Date == default)
                 throw new ArgumentException("Date is required.");
+
+            if (service.Date > DateTime.MaxValue.AddMonths(-6))
+                throw new ArgumentException("Date is outside the supported range.");
+            if (service.Mileage > int.MaxValue - 10000)
+                throw new ArgumentException("Mileage is outside the supported range.");
 
             // El kilometraje tiene que ser mayor a 0.
             if (service.Mileage <= 0)

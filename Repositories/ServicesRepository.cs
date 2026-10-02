@@ -78,6 +78,7 @@ namespace BoxService_BackEnd.Repositories
         public Service Create(Service service)
         {
             using var connection = DatabaseConnection.GetConnection();
+            using var transaction = connection.BeginTransaction();
 
             const string sql = @"
                 INSERT INTO services (
@@ -100,17 +101,26 @@ namespace BoxService_BackEnd.Repositories
                 )
                 RETURNING id_service;";
 
-            using var command = new NpgsqlCommand(sql, connection);
+            using var command = new NpgsqlCommand(sql, connection, transaction);
 
-            command.Parameters.AddWithValue("fecha", service.Date);
+            command.Parameters.AddWithValue("fecha", DateOnly.FromDateTime(service.Date));
             command.Parameters.AddWithValue("kilometraje", service.Mileage);
             command.Parameters.AddWithValue("tipo_service", service.ServiceType);
             command.Parameters.AddWithValue("observaciones", (object?)service.Notes ?? DBNull.Value);
             command.Parameters.AddWithValue("proximo_km", (object?)service.NextMileage ?? DBNull.Value);
-            command.Parameters.AddWithValue("proxima_fecha", (object?)service.NextDate ?? DBNull.Value);
+            command.Parameters.AddWithValue("proxima_fecha", NpgsqlTypes.NpgsqlDbType.Date,
+                service.NextDate.HasValue ? DateOnly.FromDateTime(service.NextDate.Value) : DBNull.Value);
             command.Parameters.AddWithValue("id_vehiculo", service.VehicleId);
 
             service.ServiceId = Convert.ToInt32(command.ExecuteScalar());
+
+            using var mileage = new NpgsqlCommand(@"
+                UPDATE vehiculos SET kilometraje_actual = GREATEST(COALESCE(kilometraje_actual, 0), @km)
+                WHERE id_vehiculo = @id", connection, transaction);
+            mileage.Parameters.AddWithValue("km", service.Mileage);
+            mileage.Parameters.AddWithValue("id", service.VehicleId);
+            mileage.ExecuteNonQuery();
+            transaction.Commit();
 
             return service;
         }
@@ -136,7 +146,7 @@ namespace BoxService_BackEnd.Repositories
             {
                 detalles.Add(new ServiceDetail
                 {
-                    DetailId  = reader.GetInt32(reader.GetOrdinal("id_detalle")),
+                    DetailId = reader.GetInt32(reader.GetOrdinal("id_detalle")),
                     ServiceId = reader.GetInt32(reader.GetOrdinal("id_service")),
                     Description = reader.GetString(reader.GetOrdinal("descripcion")),
                     Done = reader.GetBoolean(reader.GetOrdinal("realizado"))

@@ -18,7 +18,7 @@ namespace BoxService_BackEnd.Services
 
         public Vehicle? GetById(int id) => _repository.GetById(id);
 
-        public Vehicle? FindByPlate(string plate) => _repository.GetByPlate(plate);
+        public Vehicle? FindByPlate(string plate) => _repository.GetByPlate(plate.Trim().ToUpperInvariant());
 
         public Vehicle Create(VehicleCreateRequest request)
         {
@@ -39,7 +39,7 @@ namespace BoxService_BackEnd.Services
             if (request.CurrentMileage < 0)
                 throw new ArgumentException("Current mileage cannot be negative.");
 
-            var existing = _repository.GetByPlate(request.Plate);
+            var existing = FindByPlate(request.Plate);
 
             if (existing != null)
                 throw new InvalidOperationException("A vehicle with that plate already exists.");
@@ -54,7 +54,7 @@ namespace BoxService_BackEnd.Services
 
                 // NUEVO:
                 // Esto viene desde el front como currentMileage
-                // y después VehicleRepository lo guarda en kilometraje_actual.
+                // y despuÃ©s VehicleRepository lo guarda en kilometraje_actual.
                 CurrentMileage = request.CurrentMileage
             };
 

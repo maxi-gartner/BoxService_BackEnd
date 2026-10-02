@@ -45,6 +45,32 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
+        // Usado por el portal del cliente para mostrar el último
+        // presupuesto de un vehículo puntual — el resto de la API no
+        // necesitaba filtrar presupuestos por vehículo hasta ahora.
+        public List<Budget> GetByVehicleId(int vehicleId)
+        {
+            var lista = new List<Budget>();
+
+            using var conn = DatabaseConnection.GetConnection();
+
+            using var cmd = new NpgsqlCommand(
+                "SELECT * FROM presupuestos WHERE id_vehiculo = @id ORDER BY created_at DESC",
+                conn
+            );
+
+            cmd.Parameters.AddWithValue("id", vehicleId);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                lista.Add(MapRow(reader));
+            }
+
+            return lista;
+        }
+
         public List<BudgetDetail> GetDetails(int budgetId)
         {
             var lista = new List<BudgetDetail>();
@@ -96,7 +122,25 @@ namespace BoxService_BackEnd.Repositories
         public int Create(Budget b)
         {
             using var conn = DatabaseConnection.GetConnection();
+            return Create(b, conn, null);
+        }
 
+        public int CreateWithDetails(Budget budget, List<BudgetDetail> details)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var tx = conn.BeginTransaction();
+            var id = Create(budget, conn, tx);
+            foreach (var detail in details)
+            {
+                detail.BudgetId = id;
+                CreateDetail(detail, conn, tx);
+            }
+            tx.Commit();
+            return id;
+        }
+
+        private static int Create(Budget b, NpgsqlConnection conn, NpgsqlTransaction? tx)
+        {
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO presupuestos (
                     numero,
@@ -112,7 +156,7 @@ namespace BoxService_BackEnd.Repositories
                     @observaciones,
                     @id_vehiculo
                 )
-                RETURNING id_presupuesto", conn);
+                RETURNING id_presupuesto", conn, tx);
 
             cmd.Parameters.AddWithValue("numero", b.Number);
             cmd.Parameters.AddWithValue("fecha", DateTime.Today);
