@@ -3,7 +3,7 @@
 Backend en [Render](https://render.com) (Docker — Render no tiene runtime
 nativo para .NET), frontend en [Vercel](https://vercel.com) — ver el
 `DEPLOYMENT.md` de `BoxService_FrontEnd/web/`. Postgres en
-[Supabase](https://supabase.com), un proyecto por ambiente.
+[Supabase](https://supabase.com).
 
 ## Ambientes
 
@@ -13,8 +13,21 @@ un ensayo antes de cada release.
 
 | Ambiente | Rama | Servicio Render | Proyecto Supabase |
 |---|---|---|---|
-| development | `develop` | `boxservice-backend-dev` | el proyecto actual (ya tiene datos de prueba del equipo) |
-| production | `main` | `boxservice-backend-prod` | proyecto nuevo, vacío |
+| development | `develop` | `boxservice-backend-dev` | el mismo proyecto de Supabase que production |
+| production | `main` | `boxservice-backend-prod` | el proyecto de Supabase actual |
+
+**Un solo Supabase para los dos ambientes, a propósito** (decisión
+explícita, no un descuido): simplifica la gestión mientras no hay
+usuarios reales todavía — no hay que mantener 2 bases sincronizadas ni
+duplicar datos de catálogo/config. `ConnectionStrings__DefaultConnection`
+es **el mismo valor** en `boxservice-backend-dev` y en
+`boxservice-backend-prod`.
+
+Costo de esta simplificación, para tenerlo presente: probar algo en
+`develop` escribe en la misma base que ve "production". Mientras
+production no tenga clientes reales no es un problema — el día que los
+haya, separar en 2 proyectos de Supabase es un cambio de una sola env var
+por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 
 ## Dónde vive cada secreto
 
@@ -36,7 +49,7 @@ un ensayo antes de cada release.
 
 | Env var | Equivale a (`appsettings.json`) | Ejemplo |
 |---|---|---|
-| `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | connection string de Supabase de ese ambiente |
+| `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | connection string de Supabase — **la misma en dev y en prod**, ver más arriba |
 | `Jwt__Key` | `Jwt:Key` | 32+ bytes al azar, **distinta en dev y en prod** |
 | `Jwt__Users__0__Username` | `Jwt:Users[0].Username` | `superadmin` |
 | `Jwt__Users__0__PasswordHash` | `Jwt:Users[0].PasswordHash` | generado con `dotnet run -- hash-password "<pwd>"` (ver README) |
