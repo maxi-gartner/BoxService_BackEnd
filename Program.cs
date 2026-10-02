@@ -113,10 +113,16 @@ builder.Services.AddScoped<ClientRepository>();
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<VehicleService>();
+builder.Services.AddScoped<BudgetRepository>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<ServicesService>();
 builder.Services.AddScoped<CatalogService>();
+
+// ── Portal del cliente (login con Google, ver estado del vehículo) ───
+builder.Services.AddScoped<PortalAccessRepository>();
+builder.Services.AddScoped<PortalService>();
+builder.Services.AddScoped<PortalAuthService>();
 
 var app = builder.Build();
 
@@ -157,7 +163,8 @@ app.UseStatusCodePages(async statusContext =>
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
-    var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login";
+    var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login"
+        || path == "/portal/auth/google";
 
     if (!isPublicRoute && context.User.Identity?.IsAuthenticated != true)
     {
@@ -174,6 +181,30 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "No tenés permisos para modificar el catálogo."));
         return;
+    }
+
+    // El portal del cliente (role "customer") es un mundo aparte del
+    // staff: solo puede pisar /portal/*, y nada del staff puede pisar
+    // /portal/* salvo que sea "customer". Sin esto, cualquier JWT
+    // autenticado (de cualquier lado) entraría a todo lo demás, porque
+    // el resto de las rutas de acá arriba solo chequean IsAuthenticated.
+    var isPortalRoute = path.StartsWith("/portal", StringComparison.OrdinalIgnoreCase)
+        && path != "/portal/auth/google";
+    if (!isPublicRoute)
+    {
+        if (isPortalRoute && role != "customer")
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para el portal del cliente."));
+            return;
+        }
+
+        if (!isPortalRoute && role == "customer")
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para el equipo del taller."));
+            return;
+        }
     }
 
     await next();
@@ -277,5 +308,6 @@ app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
+app.MapPortalEndpoints();
 
 app.Run();

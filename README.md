@@ -319,3 +319,4 @@ Más detalle:
 - [Estructura ASP.NET Core](docs/ESTRUCTURA_BACKEND_CORE.md)
 - [Convenciones Backend ASP.NET Core](docs/CONVENCIONES_BACKEND_CORE.md)
 - [Infraestructura: ambientes, CI/CD y secretos](docs/DEPLOYMENT.md)
+- [Portal del cliente (login con Google)](docs/PORTAL.md)

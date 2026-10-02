@@ -42,6 +42,10 @@ services:
         sync: false
       - key: Cors__AllowedOrigin
         sync: false
+      - key: Google__ClientId
+        sync: false
+      - key: Portal__AppUrl
+        sync: false
 
   - type: web
     name: boxservice-backend-prod
@@ -79,4 +83,8 @@ services:
       - key: Jwt__Users__2__Role
         sync: false
       - key: Cors__AllowedOrigin
+        sync: false
+      - key: Google__ClientId
+        sync: false
+      - key: Portal__AppUrl
         sync: false

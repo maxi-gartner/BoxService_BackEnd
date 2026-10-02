@@ -43,6 +43,8 @@ un ensayo antes de cada release.
 | `Jwt__Users__0__Role` | `Jwt:Users[0].Role` | `superadmin` |
 | ...`__1__`, `__2__` | ídem para `dueno` y `empleado` | |
 | `Cors__AllowedOrigin` | (nuevo, no existe en local) | la URL del frontend de ese ambiente en Vercel |
+| `Google__ClientId` | `Google:ClientId` | OAuth Client ID de Google Cloud Console — ver `docs/PORTAL.md` |
+| `Portal__AppUrl` | `Portal:AppUrl` | la misma URL del frontend que `Cors__AllowedOrigin` |
 
 `Jwt__Issuer`, `Jwt__Audience` y `Jwt__ExpiresMinutes` ya vienen con un
 valor por defecto en `render.yaml` — no hace falta tocarlos salvo que
