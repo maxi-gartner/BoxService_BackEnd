@@ -15,6 +15,7 @@
     <Folder Include="Repositories\" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
     <PackageReference Include="Npgsql" Version="10.0.2" />
+    <PackageReference Include="Supabase" Version="8.1.0" />
   </ItemGroup>
 
   <!-- Copia las migraciones SQL al directorio de compilación -->

@@ -7,6 +7,7 @@ using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
+using BoxService_BackEnd.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -74,6 +75,9 @@ builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddScoped<ServiceInspectionRepository>();
+builder.Services.AddScoped<ServiceInspectionService>();
+builder.Services.AddSingleton<SupabaseStorageService>();
 builder.Services.AddScoped<ServicesService>();
 builder.Services.AddScoped<CatalogService>();
 
@@ -89,6 +93,12 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? Environment.GetEnvironmentVariable("BOXSERVICE_CONNECTION_STRING")
     ?? throw new InvalidOperationException("No hay connection string configurada.");
 DatabaseConnection.Configure(connectionString);
+
+if (args.Contains("--setup-db", StringComparer.OrdinalIgnoreCase))
+{
+    await DatabaseSetup.SetupAsync(connectionString);
+    return;
+}
 
 app.UseExceptionHandler(errorApp =>
 {
@@ -234,6 +244,7 @@ app.MapPost("/clients", (ClientCreateRequest request, ClientService service) =>
 app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
+app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
 
