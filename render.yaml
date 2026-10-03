@@ -1,0 +1,90 @@
+# Blueprint de Render — ver https://render.com/docs/blueprint-spec
+# Crea 2 servicios (development y production), cada uno atado a su rama.
+# Los env vars marcados "sync: false" se piden en el dashboard al crear el
+# Blueprint y nunca quedan en el repo — ver docs/DEPLOYMENT.md para el
+# detalle de qué va en cada uno.
+
+services:
+  - type: web
+    name: boxservice-backend-dev
+    runtime: docker
+    branch: develop
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Issuer
+        value: BoxService
+      - key: Jwt__Audience
+        value: BoxService.FrontEnd
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__ExpiresMinutes
+        value: "60"
+      - key: Jwt__Users__0__Username
+        sync: false
+      - key: Jwt__Users__0__PasswordHash
+        sync: false
+      - key: Jwt__Users__0__Role
+        sync: false
+      - key: Jwt__Users__1__Username
+        sync: false
+      - key: Jwt__Users__1__PasswordHash
+        sync: false
+      - key: Jwt__Users__1__Role
+        sync: false
+      - key: Jwt__Users__2__Username
+        sync: false
+      - key: Jwt__Users__2__PasswordHash
+        sync: false
+      - key: Jwt__Users__2__Role
+        sync: false
+      - key: Cors__AllowedOrigin
+        sync: false
+      - key: Google__ClientId
+        sync: false
+      - key: Portal__AppUrl
+        sync: false
+
+  - type: web
+    name: boxservice-backend-prod
+    runtime: docker
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Issuer
+        value: BoxService
+      - key: Jwt__Audience
+        value: BoxService.FrontEnd
+      - key: Jwt__Key
+        sync: false
+      - key: Jwt__ExpiresMinutes
+        value: "60"
+      - key: Jwt__Users__0__Username
+        sync: false
+      - key: Jwt__Users__0__PasswordHash
+        sync: false
+      - key: Jwt__Users__0__Role
+        sync: false
+      - key: Jwt__Users__1__Username
+        sync: false
+      - key: Jwt__Users__1__PasswordHash
+        sync: false
+      - key: Jwt__Users__1__Role
+        sync: false
+      - key: Jwt__Users__2__Username
+        sync: false
+      - key: Jwt__Users__2__PasswordHash
+        sync: false
+      - key: Jwt__Users__2__Role
+        sync: false
+      - key: Cors__AllowedOrigin
+        sync: false
+      - key: Google__ClientId
+        sync: false
+      - key: Portal__AppUrl
+        sync: false

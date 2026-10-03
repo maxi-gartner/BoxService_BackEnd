@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.vscode/
+.git/
+*.user
+
+# Nunca va en la imagen: no existe en el repo, cada quien tiene el suyo, y
+# en los ambientes desplegados la config sale de variables de entorno.
+appsettings.json
+appsettings.Development.json
+appsettings.Local.json

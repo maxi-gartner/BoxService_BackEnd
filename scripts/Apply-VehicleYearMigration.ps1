@@ -5,7 +5,7 @@ $dotnetRoot = Split-Path (Get-Command dotnet).Source -Parent
 $logging = Get-ChildItem (Join-Path $dotnetRoot 'shared/Microsoft.AspNetCore.App/*/Microsoft.Extensions.Logging.Abstractions.dll') |
     Sort-Object FullName -Descending | Select-Object -First 1
 [void][Reflection.Assembly]::LoadFrom($logging.FullName)
-[void][Reflection.Assembly]::LoadFrom((Join-Path $root 'bin/Debug/net8.0/Npgsql.dll'))
+[void][Reflection.Assembly]::LoadFrom((Join-Path $root 'bin/Debug/net10.0/Npgsql.dll'))
 $connection = [Npgsql.NpgsqlConnection]::new($config.ConnectionStrings.DefaultConnection)
 try {
     $connection.Open()
