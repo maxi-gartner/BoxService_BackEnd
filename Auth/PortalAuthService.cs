@@ -61,6 +61,13 @@ public sealed class PortalAuthService(
 
         if (clientId is null)
         {
+            // Sin esto, diagnosticar "por qué" significaba ir a mirar la
+            // tabla a mano — con el log alcanza para distinguir "no vino
+            // ningún token" de "vino uno pero no matcheó" (viejo, ya
+            // consumido, vencido, o directamente mal copiado).
+            logger.LogWarning(
+                "Invitación no encontrada para google_sub={GoogleSub}. inviteToken recibido: {HasToken}",
+                payload.Subject, string.IsNullOrWhiteSpace(inviteToken) ? "(vacío)" : inviteToken);
             return PortalAuthOutcome.Invalid("Necesitás una invitación de tu taller para entrar acá.");
         }
 
