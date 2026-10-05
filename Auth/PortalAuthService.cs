@@ -17,7 +17,8 @@ public sealed class PortalAuthService(
     IOptions<AuthOptions> jwtOptions,
     IConfiguration configuration,
     PortalAccessRepository access,
-    ClientRepository clients)
+    ClientRepository clients,
+    ILogger<PortalAuthService> logger)
 {
     private readonly AuthOptions _jwt = jwtOptions.Value;
 
@@ -33,8 +34,12 @@ public sealed class PortalAuthService(
                 Audience = [googleClientId],
             });
         }
-        catch (InvalidJwtException)
+        catch (InvalidJwtException ex)
         {
+            // Mensaje genérico al cliente a propósito (no revelar detalle de
+            // validación) — pero el motivo real queda en los logs del
+            // servicio para poder diagnosticar un mismatch de Client ID.
+            logger.LogWarning(ex, "Token de Google rechazado.");
             return PortalAuthOutcome.Invalid("Token de Google inválido.");
         }
 
