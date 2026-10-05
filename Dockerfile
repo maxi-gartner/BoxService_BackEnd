@@ -13,6 +13,15 @@ RUN dotnet publish BoxService_BackEnd.csproj -c Release -o /app/publish --no-res
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
+# La imagen base viene recortada al mínimo y no trae libgssapi_krb5 — lo
+# pide la pila de TLS de Npgsql/Google.Apis.Auth al conectar a Supabase o
+# validar tokens de Google, y sin esto el proceso ni arranca
+# ("libgssapi_krb5.so.2: cannot open shared object file").
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libkrb5-3 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 
 # Render setea PORT en runtime; Program.cs lo lee y escucha en 0.0.0.0:$PORT.
