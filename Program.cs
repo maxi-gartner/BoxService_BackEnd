@@ -42,6 +42,16 @@ if (args.Length > 0 && args[0] == "migrate")
 builder.Services.Configure<Microsoft.AspNetCore.Routing.RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = false);
 
+// Por defecto ASP.NET Core loguea en nivel Info cada request completo
+// (6 líneas por pedido: "Request starting", "Executing endpoint",
+// "Setting status code", "Writing value", "Executed endpoint", "Request
+// finished") — contra /health, que Render pinguea cada pocos segundos en
+// 2 servicios, eso ahoga cualquier log real (como el LogWarning de
+// PortalAuthService cuando Google rechaza un token). Subir el piso de
+// Microsoft.AspNetCore a Warning saca esos 6 logs por request de en
+// medio, sin tocar ningún Warning/Error — que es justo lo que importa ver.
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+
 // PORT solo la setea Render (u otro PaaS similar) — si está, escuchamos en
 // 0.0.0.0:$PORT porque el health check le pega desde afuera del contenedor.
 // Sin PORT (dev local) seguimos en localhost:5001 como siempre: bindear
