@@ -14,7 +14,7 @@ namespace BoxService_BackEnd.Repositories
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_tenant, nombre, activo, created_at
+                SELECT id_tenant, nombre, activo, created_at, telefono, email
                 FROM tenants
                 ORDER BY id_tenant;", conn);
 
@@ -31,7 +31,7 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_tenant, nombre, activo, created_at
+                SELECT id_tenant, nombre, activo, created_at, telefono, email
                 FROM tenants
                 WHERE id_tenant = @id;", conn);
 
@@ -41,13 +41,43 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
+        // Lista de superadmin: cada taller con el nombre/usuario de su
+        // dueño ya resuelto (subconsulta al más antiguo "dueno" del
+        // tenant — en el caso normal de uno solo, es exactamente ese).
+        public List<TenantWithOwner> GetAllWithOwner()
+        {
+            var result = new List<TenantWithOwner>();
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT t.id_tenant, t.nombre, t.activo, t.created_at, t.telefono, t.email,
+                       (SELECT u.nombre FROM usuarios u WHERE u.id_tenant = t.id_tenant AND u.role = 'dueno' ORDER BY u.id_usuario LIMIT 1) AS owner_nombre,
+                       (SELECT u.username FROM usuarios u WHERE u.id_tenant = t.id_tenant AND u.role = 'dueno' ORDER BY u.id_usuario LIMIT 1) AS owner_username
+                FROM tenants t
+                ORDER BY t.id_tenant;", conn);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var tenant = MapRow(reader);
+                var ownerNameOrdinal = reader.GetOrdinal("owner_nombre");
+                var ownerUsernameOrdinal = reader.GetOrdinal("owner_username");
+                result.Add(new TenantWithOwner(
+                    tenant,
+                    reader.IsDBNull(ownerNameOrdinal) ? null : reader.GetString(ownerNameOrdinal),
+                    reader.IsDBNull(ownerUsernameOrdinal) ? null : reader.GetString(ownerUsernameOrdinal)));
+            }
+
+            return result;
+        }
+
         public Tenant Create(string name)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO tenants (nombre)
                 VALUES (@nombre)
-                RETURNING id_tenant, nombre, activo, created_at;", conn);
+                RETURNING id_tenant, nombre, activo, created_at, telefono, email;", conn);
 
             cmd.Parameters.AddWithValue("nombre", name);
 
@@ -60,18 +90,21 @@ namespace BoxService_BackEnd.Repositories
         // transacción — si falla cualquiera de los dos inserts, no queda
         // un tenant huérfano sin dueño ni un usuario suelto sin tenant.
         public (Tenant Tenant, UserAccount Owner) CreateWithOwner(
-            string businessName, string username, string passwordHash, string ownerName)
+            string businessName, string username, string passwordHash, string ownerName,
+            string? telefono, string? email)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var transaction = conn.BeginTransaction();
 
             Tenant tenant;
             using (var cmd = new NpgsqlCommand(@"
-                INSERT INTO tenants (nombre)
-                VALUES (@nombre)
-                RETURNING id_tenant, nombre, activo, created_at;", conn, transaction))
+                INSERT INTO tenants (nombre, telefono, email)
+                VALUES (@nombre, @telefono, @email)
+                RETURNING id_tenant, nombre, activo, created_at, telefono, email;", conn, transaction))
             {
                 cmd.Parameters.AddWithValue("nombre", businessName);
+                cmd.Parameters.AddWithValue("telefono", (object?)telefono ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("email", (object?)email ?? DBNull.Value);
                 using var reader = cmd.ExecuteReader();
                 reader.Read();
                 tenant = MapRow(reader);
@@ -106,13 +139,19 @@ namespace BoxService_BackEnd.Repositories
             return (tenant, owner);
         }
 
-        public bool SetActive(int id, bool active)
+        public bool Update(int id, TenantUpdateRequest request)
         {
             using var conn = DatabaseConnection.GetConnection();
-            using var cmd = new NpgsqlCommand(
-                "UPDATE tenants SET activo = @activo WHERE id_tenant = @id;", conn);
+            using var cmd = new NpgsqlCommand(@"
+                UPDATE tenants
+                SET activo = COALESCE(@activo, activo),
+                    telefono = COALESCE(@telefono, telefono),
+                    email = COALESCE(@email, email)
+                WHERE id_tenant = @id;", conn);
 
-            cmd.Parameters.AddWithValue("activo", active);
+            cmd.Parameters.AddWithValue("activo", (object?)request.Active ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("telefono", (object?)request.Telefono?.Trim() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("email", (object?)request.Email?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("id", id);
 
             return cmd.ExecuteNonQuery() > 0;
@@ -124,6 +163,8 @@ namespace BoxService_BackEnd.Repositories
             Name = r.GetString(r.GetOrdinal("nombre")),
             Active = r.GetBoolean(r.GetOrdinal("activo")),
             CreatedAt = r.GetDateTime(r.GetOrdinal("created_at")),
+            Telefono = r.IsDBNull(r.GetOrdinal("telefono")) ? null : r.GetString(r.GetOrdinal("telefono")),
+            Email = r.IsDBNull(r.GetOrdinal("email")) ? null : r.GetString(r.GetOrdinal("email")),
         };
     }
 }

@@ -20,6 +20,8 @@ namespace BoxService_BackEnd.Services
 
         public List<Tenant> List() => _tenants.GetAll();
 
+        public List<TenantWithOwner> ListWithOwner() => _tenants.GetAllWithOwner();
+
         public Tenant? GetById(int id) => _tenants.GetById(id);
 
         public (Tenant Tenant, UserAccount Owner) Create(TenantCreateRequest request)
@@ -45,9 +47,11 @@ namespace BoxService_BackEnd.Services
                 request.BusinessName.Trim(),
                 request.Username.Trim(),
                 passwordHash,
-                request.OwnerName.Trim());
+                request.OwnerName.Trim(),
+                string.IsNullOrWhiteSpace(request.Telefono) ? null : request.Telefono.Trim(),
+                string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim());
         }
 
-        public bool SetActive(int id, bool active) => _tenants.SetActive(id, active);
+        public bool Update(int id, TenantUpdateRequest request) => _tenants.Update(id, request);
     }
 }

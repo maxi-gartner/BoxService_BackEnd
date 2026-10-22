@@ -38,4 +38,12 @@ namespace BoxService_BackEnd.Models
         public string? Email { get; set; }
         public bool? Active { get; set; }
     }
+
+    // POST /users/{id}/reset-password — soporte cuando un dueño/empleado
+    // se olvida la contraseña. Mismo alcance que UserUpdateRequest: dueño
+    // solo dentro de su propio tenant, superadmin sobre cualquiera.
+    public class ResetPasswordRequest
+    {
+        public string NewPassword { get; set; } = string.Empty;
+    }
 }

@@ -148,6 +148,9 @@ builder.Services.AddScoped<TenantRepository>();
 builder.Services.AddScoped<TenantService>();
 builder.Services.AddScoped<SucursalRepository>();
 builder.Services.AddScoped<SucursalService>();
+builder.Services.AddScoped<TenantPaymentRepository>();
+builder.Services.AddScoped<TenantPaymentService>();
+builder.Services.AddScoped<MetricsService>();
 
 var app = builder.Build();
 
@@ -387,6 +390,7 @@ app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
 app.MapPortalEndpoints();
+app.MapMetricsEndpoints();
 app.MapTenantEndpoints();
 app.MapSucursalEndpoints();
 app.MapUserEndpoints();

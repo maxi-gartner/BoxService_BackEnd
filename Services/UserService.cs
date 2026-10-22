@@ -48,6 +48,18 @@ namespace BoxService_BackEnd.Services
             return updated ? _repository.GetById(id) : null;
         }
 
+        // Soporte: un dueño/empleado se olvidó la contraseña. Mismo
+        // alcance que Update (dueno solo su propio tenant, superadmin
+        // cualquiera) — lo garantiza el repositorio, no acá.
+        public bool ResetPassword(int id, int? callerTenantId, string newPassword)
+        {
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+                throw new ArgumentException("La contraseña debe tener al menos 6 caracteres.");
+
+            var hash = _passwordHasher.HashPassword(new UserAccount(), newPassword);
+            return _repository.UpdatePassword(id, callerTenantId, hash);
+        }
+
         private UserAccount CreateInternal(int tenantId, UserCreateRequest request, string role)
         {
             if (string.IsNullOrWhiteSpace(request.Username))

@@ -50,6 +50,44 @@ public class BudgetService
         return (true, false, "", budget);
     }
 
+    // Edita los ítems de un presupuesto que todavía no está finalizado —
+    // mientras espera aprobación (draft/sent) o ya aprobado pero sin
+    // service generado todavía (se puede sumar/sacar algo de último
+    // momento sin tener que cancelar y armar un presupuesto nuevo).
+    public (bool ok, bool notFound, string error, BudgetWithDetails? result) UpdateDetails(int id, int tenantId, BudgetDetailsUpdateRequest req)
+    {
+        var budget = _repo.GetById(id, tenantId);
+        if (budget is null) return (false, true, "Budget not found", null);
+
+        if (budget.Status is "completed" or "rejected")
+            return (false, false, "No se puede editar un presupuesto finalizado.", null);
+
+        if (req.Details is null || req.Details.Count == 0)
+            return (false, false, "details is required and must have at least one item", null);
+        foreach (var detail in req.Details)
+        {
+            if (detail is null || detail.Type is not ("labor" or "part"))
+                return (false, false, "Each detail requires type labor or part", null);
+            if (string.IsNullOrWhiteSpace(detail.Description))
+                return (false, false, "Each detail requires a description", null);
+            if (detail.Quantity <= 0 || detail.UnitPrice < 0)
+                return (false, false, "Quantity must be positive and unitPrice non-negative", null);
+        }
+
+        var details = req.Details.Select(d => new BudgetDetail
+        {
+            Type = d.Type,
+            Description = d.Description.Trim(),
+            Quantity = d.Quantity,
+            UnitPrice = d.UnitPrice,
+            Subtotal = d.Quantity * d.UnitPrice
+        }).ToList();
+
+        _repo.ReplaceDetails(id, details);
+
+        return (true, false, "", new BudgetWithDetails { Budget = budget, Details = _repo.GetDetails(id) });
+    }
+
     public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, int tenantId, BudgetStatusRequest req)
     {
         var budget = _repo.GetById(id, tenantId);

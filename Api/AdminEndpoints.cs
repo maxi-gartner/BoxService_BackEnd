@@ -17,5 +17,11 @@ public static class AdminEndpoints
                 client = ClientDto.FromModel(row.Client),
                 tenantName = row.TenantName,
             }).ToArray()));
+
+        // Vista general: de un vistazo, qué talleres pagaron el mes
+        // actual y cuál fue su último pago. El historial completo de uno
+        // puntual es GET /tenants/{id}/payments (ver TenantEndpoints.cs).
+        app.MapGet("/admin/payments", (TenantPaymentService service) =>
+            Ok(service.GetOverview().Select(TenantPaymentStatusDto.FromModel).ToArray()));
     }
 }
