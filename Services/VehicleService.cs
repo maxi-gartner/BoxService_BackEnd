@@ -52,6 +52,7 @@ namespace BoxService_BackEnd.Services
                 TenantId = tenantId,
                 Brand = request.Brand.Trim(),
                 Model = request.Model.Trim(),
+                Version = string.IsNullOrWhiteSpace(request.Version) ? null : request.Version.Trim(),
                 Year = request.Year,
                 Plate = plate,
                 CurrentMileage = request.CurrentMileage

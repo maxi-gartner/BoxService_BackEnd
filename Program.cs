@@ -152,6 +152,11 @@ builder.Services.AddScoped<TenantPaymentRepository>();
 builder.Services.AddScoped<TenantPaymentService>();
 builder.Services.AddScoped<MetricsService>();
 
+// Singleton: cachea el token de app y el listado de marcas en memoria
+// entre requests (ver MercadoLibreCatalogService).
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<MercadoLibreCatalogService>();
+
 var app = builder.Build();
 
 // ── Conexión compartida para el código viejo ──────────────────────────
@@ -391,6 +396,7 @@ app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
 app.MapPortalEndpoints();
 app.MapMetricsEndpoints();
+app.MapVehicleCatalogEndpoints();
 app.MapTenantEndpoints();
 app.MapSucursalEndpoints();
 app.MapUserEndpoints();

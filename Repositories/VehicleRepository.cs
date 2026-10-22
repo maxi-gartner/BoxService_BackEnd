@@ -21,6 +21,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual,
@@ -52,6 +53,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual,
@@ -78,6 +80,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual,
@@ -119,6 +122,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual,
@@ -155,6 +159,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual,
@@ -185,6 +190,7 @@ namespace BoxService_BackEnd.Repositories
                     tenant_id,
                     marca,
                     modelo,
+                    version,
                     anio,
                     patente,
                     kilometraje_actual
@@ -194,6 +200,7 @@ namespace BoxService_BackEnd.Repositories
                     @tenant_id,
                     @marca,
                     @modelo,
+                    @version,
                     @anio,
                     @patente,
                     @kilometraje_actual
@@ -204,6 +211,7 @@ namespace BoxService_BackEnd.Repositories
             cmd.Parameters.AddWithValue("tenant_id", vehicle.TenantId);
             cmd.Parameters.AddWithValue("marca", vehicle.Brand);
             cmd.Parameters.AddWithValue("modelo", vehicle.Model);
+            cmd.Parameters.AddWithValue("version", string.IsNullOrWhiteSpace(vehicle.Version) ? DBNull.Value : vehicle.Version);
             cmd.Parameters.AddWithValue("anio", vehicle.Year.HasValue ? (object)vehicle.Year.Value : DBNull.Value);
             cmd.Parameters.AddWithValue("patente", vehicle.Plate);
             cmd.Parameters.AddWithValue("kilometraje_actual", vehicle.CurrentMileage);
@@ -225,6 +233,10 @@ namespace BoxService_BackEnd.Repositories
             TenantId = r.GetInt32(r.GetOrdinal("tenant_id")),
             Brand = r.GetString(r.GetOrdinal("marca")),
             Model = r.GetString(r.GetOrdinal("modelo")),
+
+            Version = r.IsDBNull(r.GetOrdinal("version"))
+                ? null
+                : r.GetString(r.GetOrdinal("version")),
 
             Year = r.IsDBNull(r.GetOrdinal("anio"))
                 ? null

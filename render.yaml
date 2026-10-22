@@ -28,6 +28,10 @@ services:
         sync: false
       - key: Portal__AppUrl
         sync: false
+      - key: MercadoLibre__ClientId
+        sync: false
+      - key: MercadoLibre__ClientSecret
+        sync: false
 
   - type: web
     name: boxservice-backend-prod
@@ -51,4 +55,8 @@ services:
       - key: Google__ClientId
         sync: false
       - key: Portal__AppUrl
+        sync: false
+      - key: MercadoLibre__ClientId
+        sync: false
+      - key: MercadoLibre__ClientSecret
         sync: false

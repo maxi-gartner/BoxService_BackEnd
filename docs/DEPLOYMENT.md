@@ -54,6 +54,8 @@ por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 | `Cors__AllowedOrigin` | (nuevo, no existe en local) | la URL del frontend de ese ambiente en Vercel |
 | `Google__ClientId` | `Google:ClientId` | OAuth Client ID de Google Cloud Console — ver `docs/PORTAL.md` |
 | `Portal__AppUrl` | `Portal:AppUrl` | la misma URL del frontend que `Cors__AllowedOrigin` |
+| `MercadoLibre__ClientId` | `MercadoLibre:ClientId` | App ID de developers.mercadolibre.com.ar — sugerencias de marca/modelo al cargar un vehículo, opcional (sin esto el form sigue funcionando con texto libre) |
+| `MercadoLibre__ClientSecret` | `MercadoLibre:ClientSecret` | Secret Key de la misma aplicación |
 
 `Jwt__Issuer`, `Jwt__Audience` y `Jwt__ExpiresMinutes` ya vienen con un
 valor por defecto en `render.yaml` — no hace falta tocarlos salvo que
