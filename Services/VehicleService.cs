@@ -14,13 +14,14 @@ namespace BoxService_BackEnd.Services
             _repository = repository;
         }
 
-        public List<Vehicle> List() => _repository.GetAll();
+        public List<Vehicle> List(int tenantId) => _repository.GetAll(tenantId);
 
-        public Vehicle? GetById(int id) => _repository.GetById(id);
+        public Vehicle? GetById(int id, int tenantId) => _repository.GetById(id, tenantId);
 
-        public Vehicle? FindByPlate(string plate) => _repository.GetByPlate(plate.Trim().ToUpperInvariant());
+        public Vehicle? FindByPlate(string plate, int tenantId) =>
+            _repository.GetByPlate(plate.Trim().ToUpperInvariant(), tenantId);
 
-        public Vehicle Create(VehicleCreateRequest request)
+        public Vehicle Create(int tenantId, VehicleCreateRequest request)
         {
             if (request.ClientId <= 0)
                 throw new ArgumentException("client_id is required and must be greater than 0.");
@@ -34,27 +35,25 @@ namespace BoxService_BackEnd.Services
             if (string.IsNullOrWhiteSpace(request.Plate))
                 throw new ArgumentException("Plate is required.");
 
-            // NUEVO:
-            // Validamos que el kilometraje actual no sea negativo.
             if (request.CurrentMileage < 0)
                 throw new ArgumentException("Current mileage cannot be negative.");
 
-            var existing = FindByPlate(request.Plate);
+            var plate = request.Plate.Trim().ToUpperInvariant();
 
-            if (existing != null)
+            // La patente es única en toda la tabla (constraint de la base,
+            // de antes del multi-tenant) — el chequeo de unicidad es
+            // global a propósito, no por tenant.
+            if (_repository.PlateExistsAnywhere(plate))
                 throw new InvalidOperationException("A vehicle with that plate already exists.");
 
             var vehicle = new Vehicle
             {
                 ClientId = request.ClientId,
+                TenantId = tenantId,
                 Brand = request.Brand.Trim(),
                 Model = request.Model.Trim(),
                 Year = request.Year,
-                Plate = request.Plate.Trim().ToUpperInvariant(),
-
-                // NUEVO:
-                // Esto viene desde el front como currentMileage
-                // y después VehicleRepository lo guarda en kilometraje_actual.
+                Plate = plate,
                 CurrentMileage = request.CurrentMileage
             };
 

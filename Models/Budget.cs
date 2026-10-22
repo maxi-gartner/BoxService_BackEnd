@@ -4,6 +4,7 @@ namespace BoxService_BackEnd.Models
     public class Budget
     {
         public int     BudgetId  { get; set; }
+        public int     TenantId  { get; set; }
         public string  Number    { get; set; } = string.Empty; // P-0001
         public string  Date      { get; set; } = string.Empty;
         public string  Status    { get; set; } = "draft";      // draft | sent | approved | rejected

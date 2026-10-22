@@ -74,7 +74,10 @@ if (string.IsNullOrWhiteSpace(authOptions.Key) || Encoding.UTF8.GetByteCount(aut
 }
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Jwt"));
-builder.Services.AddSingleton<AuthService>();
+// Scoped, no Singleton: AuthService ahora depende de UserRepository
+// (consulta la tabla "usuarios"), y un singleton no puede depender de un
+// servicio scoped.
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -137,6 +140,14 @@ builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<PortalAccessRepository>();
 builder.Services.AddScoped<PortalService>();
 builder.Services.AddScoped<PortalAuthService>();
+
+// ── Multi-tenant: tenants, sucursales, usuarios reales ────────────────
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<TenantRepository>();
+builder.Services.AddScoped<TenantService>();
+builder.Services.AddScoped<SucursalRepository>();
+builder.Services.AddScoped<SucursalService>();
 
 var app = builder.Build();
 
@@ -227,6 +238,43 @@ app.Use(async (context, next) =>
         }
     }
 
+    // ── Multi-tenant: superadmin administra talleres, no es "como un
+    // tenant" él mismo — no tiene tenantId propio, así que no puede pisar
+    // las rutas operativas de un taller puntual (clients/vehicles/
+    // budgets/services/invoices/catalog/sucursales), solo las de
+    // administración. Al revés: dueno/empleado no pueden pisar /tenants
+    // ni /admin, eso es solo de superadmin.
+    var isAdminRoute = path.StartsWith("/tenants", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase);
+    var isUsersRoute = path == "/users" || path.StartsWith("/users/", StringComparison.OrdinalIgnoreCase);
+    var isSuperadminAllowed = isPublicRoute || isAdminRoute || isUsersRoute || path == "/auth/me";
+
+    if (!isPublicRoute && role == "superadmin" && !isSuperadminAllowed)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es de un taller puntual — superadmin administra talleres, no opera uno."));
+        return;
+    }
+
+    if (!isPublicRoute && role is "dueno" or "empleado" && isAdminRoute)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para superadmin."));
+        return;
+    }
+
+    // Sucursales y usuarios: dar de alta/editar es solo del dueño, no del
+    // empleado (mismo criterio que ya aplica el catalog-write de arriba).
+    var isSucursalWrite = path.StartsWith("/sucursales", StringComparison.OrdinalIgnoreCase)
+        && !HttpMethods.IsGet(context.Request.Method);
+    var isUsersWrite = isUsersRoute && !HttpMethods.IsGet(context.Request.Method);
+    if (role == "empleado" && (isSucursalWrite || isUsersWrite))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail(403, "Esto es solo para el dueño del taller."));
+        return;
+    }
+
     await next();
 });
 
@@ -271,11 +319,19 @@ app.MapPost("/auth/login", (LoginRequest request, AuthService authService) =>
         : Results.Ok(ApiEnvelope<object>.Ok(result));
 });
 
-app.MapGet("/auth/me", (HttpContext context) => ApiEnvelope<object>.Ok(new
+app.MapGet("/auth/me", (HttpContext context, TenantRepository tenantRepository) =>
 {
-    username = context.User.Identity?.Name,
-    role = context.User.FindFirst("role")?.Value,
-}));
+    var tenantId = context.TenantIdOrNull();
+    var tenant = tenantId is int id ? tenantRepository.GetById(id) : null;
+
+    return ApiEnvelope<object>.Ok(new
+    {
+        username = context.User.Identity?.Name,
+        role = context.User.FindFirst("role")?.Value,
+        tenantId,
+        tenantName = tenant?.Name,
+    });
+});
 
 // ── Clientes ───────────────────────────────────────────────────────
 // Primer módulo funcional migrado de verdad al pipeline de ASP.NET Core.
@@ -284,34 +340,35 @@ app.MapGet("/auth/me", (HttpContext context) => ApiEnvelope<object>.Ok(new
 // HttpListenerRequest/Response, ahora habla el contrato REST que ya espera
 // el frontend nuevo (web/docs/API_CONTRACT.md), vía ClientDto/VehicleDto.
 
-app.MapGet("/clients", (ClientService service) =>
-    ApiEnvelope<object>.Ok(service.List().Select(ClientDto.FromModel))).RequireAuthorization();
+app.MapGet("/clients", (HttpContext context, ClientService service) =>
+    ApiEnvelope<object>.Ok(service.List(context.TenantId()).Select(ClientDto.FromModel))).RequireAuthorization();
 
-app.MapGet("/clients/{id:int}", (int id, ClientService service) =>
+app.MapGet("/clients/{id:int}", (int id, HttpContext context, ClientService service) =>
 {
-    var client = service.GetById(id);
+    var client = service.GetById(id, context.TenantId());
     return client is null
         ? Results.Json(ApiEnvelope<object>.Fail(404, "Client not found."), statusCode: StatusCodes.Status404NotFound)
         : Results.Ok(ApiEnvelope<object>.Ok(ClientDto.FromModel(client)));
 }).RequireAuthorization();
 
-app.MapGet("/clients/{id:int}/vehicles", (int id, ClientService service, VehicleRepository vehicleRepository) =>
+app.MapGet("/clients/{id:int}/vehicles", (int id, HttpContext context, ClientService service, VehicleRepository vehicleRepository) =>
 {
-    var client = service.GetById(id);
+    var tenantId = context.TenantId();
+    var client = service.GetById(id, tenantId);
     if (client is null)
     {
         return Results.Json(ApiEnvelope<object>.Fail(404, "Client not found."), statusCode: StatusCodes.Status404NotFound);
     }
 
-    var vehicles = vehicleRepository.GetByClientId(id).Select(VehicleDto.FromModel);
+    var vehicles = vehicleRepository.GetByClientId(id, tenantId).Select(VehicleDto.FromModel);
     return Results.Ok(ApiEnvelope<object>.Ok(vehicles));
 }).RequireAuthorization();
 
-app.MapPost("/clients", (ClientCreateRequest request, ClientService service) =>
+app.MapPost("/clients", (ClientCreateRequest request, HttpContext context, ClientService service) =>
 {
     try
     {
-        var created = service.Create(request);
+        var created = service.Create(context.TenantId(), request);
         return Results.Json(
             ApiEnvelope<object>.Ok(ClientDto.FromModel(created)),
             statusCode: StatusCodes.Status201Created
@@ -330,5 +387,9 @@ app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
 app.MapPortalEndpoints();
+app.MapTenantEndpoints();
+app.MapSucursalEndpoints();
+app.MapUserEndpoints();
+app.MapAdminEndpoints();
 
 app.Run();

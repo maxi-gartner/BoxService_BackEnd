@@ -8,21 +8,23 @@ namespace BoxService_BackEnd.Repositories
 {
     public class InvoiceRepository
     {
-        public List<Invoice> GetAll()
+        public List<Invoice> GetAll(int tenantId)
         {
             var lista = new List<Invoice>();
             using var conn   = DatabaseConnection.GetConnection();
-            using var cmd    = new NpgsqlCommand("SELECT * FROM facturas ORDER BY created_at DESC", conn);
+            using var cmd    = new NpgsqlCommand("SELECT * FROM facturas WHERE tenant_id = @tenant_id ORDER BY created_at DESC", conn);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
             using var reader = cmd.ExecuteReader();
             while (reader.Read()) lista.Add(MapRow(reader));
             return lista;
         }
 
-        public Invoice? GetById(int id)
+        public Invoice? GetById(int id, int tenantId)
         {
             using var conn   = DatabaseConnection.GetConnection();
-            using var cmd    = new NpgsqlCommand("SELECT * FROM facturas WHERE id_factura = @id", conn);
+            using var cmd    = new NpgsqlCommand("SELECT * FROM facturas WHERE id_factura = @id AND tenant_id = @tenant_id", conn);
             cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? MapRow(reader) : null;
         }
@@ -56,14 +58,15 @@ namespace BoxService_BackEnd.Repositories
             try
             {
                 using var cmdInvoice = new NpgsqlCommand(@"
-                    INSERT INTO facturas (numero, fecha, total, estado, id_service, id_presupuesto)
-                    VALUES (@numero, @fecha, @total, 'issued', @id_service, @id_presupuesto)
+                    INSERT INTO facturas (numero, fecha, total, estado, id_service, id_presupuesto, tenant_id)
+                    VALUES (@numero, @fecha, @total, 'issued', @id_service, @id_presupuesto, @tenant_id)
                     RETURNING id_factura", conn, tx);
                 cmdInvoice.Parameters.AddWithValue("numero",         inv.Number);
                 cmdInvoice.Parameters.AddWithValue("fecha",          DateTime.Today);
                 cmdInvoice.Parameters.AddWithValue("total",          inv.Total);
                 cmdInvoice.Parameters.AddWithValue("id_service",     inv.ServiceId);
                 cmdInvoice.Parameters.AddWithValue("id_presupuesto", (object?)inv.BudgetId ?? DBNull.Value);
+                cmdInvoice.Parameters.AddWithValue("tenant_id",      inv.TenantId);
                 var invoiceId = (int)cmdInvoice.ExecuteScalar()!;
 
                 using var cmdService = new NpgsqlCommand(
@@ -81,18 +84,20 @@ namespace BoxService_BackEnd.Repositories
             }
         }
 
-        public void UpdateStatus(int id, string status)
+        public bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
-            using var cmd  = new NpgsqlCommand("UPDATE facturas SET estado = @estado WHERE id_factura = @id", conn);
+            using var cmd  = new NpgsqlCommand("UPDATE facturas SET estado = @estado WHERE id_factura = @id AND tenant_id = @tenant_id", conn);
             cmd.Parameters.AddWithValue("estado", status);
             cmd.Parameters.AddWithValue("id",     id);
-            cmd.ExecuteNonQuery();
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            return cmd.ExecuteNonQuery() > 0;
         }
 
         private static Invoice MapRow(NpgsqlDataReader r) => new()
         {
             InvoiceId = (int)r["id_factura"],
+            TenantId  = (int)r["tenant_id"],
             Number    = r["numero"].ToString()!,
             // Npgsql mapea las columnas DATE de Postgres a DateOnly, no a DateTime.
             Date      = ((DateOnly)r["fecha"]).ToString("yyyy-MM-dd"),

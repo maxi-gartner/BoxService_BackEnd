@@ -15,7 +15,7 @@ public sealed record ServiceDto(
 {
     public static ServiceDto FromModel(Service service) => new(
         service.ServiceId,
-        ClientDto.PlaceholderTenantId,
+        service.TenantId.ToString(),
         service.VehicleId,
         service.Date.ToString("yyyy-MM-dd"),
         service.Mileage,

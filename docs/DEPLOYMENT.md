@@ -51,10 +51,6 @@ por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 |---|---|---|
 | `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | connection string de Supabase — **la misma en dev y en prod**, ver más arriba |
 | `Jwt__Key` | `Jwt:Key` | 32+ bytes al azar, **distinta en dev y en prod** |
-| `Jwt__Users__0__Username` | `Jwt:Users[0].Username` | `superadmin` |
-| `Jwt__Users__0__PasswordHash` | `Jwt:Users[0].PasswordHash` | generado con `dotnet run -- hash-password "<pwd>"` (ver README) |
-| `Jwt__Users__0__Role` | `Jwt:Users[0].Role` | `superadmin` |
-| ...`__1__`, `__2__` | ídem para `dueno` y `empleado` | |
 | `Cors__AllowedOrigin` | (nuevo, no existe en local) | la URL del frontend de ese ambiente en Vercel |
 | `Google__ClientId` | `Google:ClientId` | OAuth Client ID de Google Cloud Console — ver `docs/PORTAL.md` |
 | `Portal__AppUrl` | `Portal:AppUrl` | la misma URL del frontend que `Cors__AllowedOrigin` |
@@ -62,6 +58,12 @@ por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 `Jwt__Issuer`, `Jwt__Audience` y `Jwt__ExpiresMinutes` ya vienen con un
 valor por defecto en `render.yaml` — no hace falta tocarlos salvo que
 cambien a propósito.
+
+Las cuentas de staff (superadmin/dueño/empleado) ya no viven en
+secretos de Render — son filas reales en la tabla `usuarios` (ver
+`docs/MULTI_TENANT.md`). No hace falta cargar nada nuevo acá cuando se
+crea un tenant o un empleado, eso se hace desde el panel de
+administración una vez desplegado.
 
 **Supabase**: el connection string sale del dashboard de cada proyecto
 (Settings → Database → Connection string, modo *Transaction pooler* como

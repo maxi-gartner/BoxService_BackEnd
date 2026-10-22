@@ -8,16 +8,18 @@ namespace BoxService_BackEnd.Repositories
 {
     public class BudgetRepository
     {
-        public List<Budget> GetAll()
+        public List<Budget> GetAll(int tenantId)
         {
             var lista = new List<Budget>();
 
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT * FROM presupuestos ORDER BY created_at DESC",
+                "SELECT * FROM presupuestos WHERE tenant_id = @tenant_id ORDER BY created_at DESC",
                 conn
             );
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
 
@@ -29,16 +31,17 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public Budget? GetById(int id)
+        public Budget? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT * FROM presupuestos WHERE id_presupuesto = @id",
+                "SELECT * FROM presupuestos WHERE id_presupuesto = @id AND tenant_id = @tenant_id",
                 conn
             );
 
             cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
 
@@ -119,12 +122,6 @@ namespace BoxService_BackEnd.Repositories
             return (long)cmd.ExecuteScalar()!;
         }
 
-        public int Create(Budget b)
-        {
-            using var conn = DatabaseConnection.GetConnection();
-            return Create(b, conn, null);
-        }
-
         public int CreateWithDetails(Budget budget, List<BudgetDetail> details)
         {
             using var conn = DatabaseConnection.GetConnection();
@@ -147,14 +144,16 @@ namespace BoxService_BackEnd.Repositories
                     fecha,
                     estado,
                     observaciones,
-                    id_vehiculo
+                    id_vehiculo,
+                    tenant_id
                 )
                 VALUES (
                     @numero,
                     @fecha,
                     @estado,
                     @observaciones,
-                    @id_vehiculo
+                    @id_vehiculo,
+                    @tenant_id
                 )
                 RETURNING id_presupuesto", conn, tx);
 
@@ -163,6 +162,7 @@ namespace BoxService_BackEnd.Repositories
             cmd.Parameters.AddWithValue("estado", "draft");
             cmd.Parameters.AddWithValue("observaciones", (object?)b.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("id_vehiculo", b.VehicleId);
+            cmd.Parameters.AddWithValue("tenant_id", b.TenantId);
 
             return (int)cmd.ExecuteScalar()!;
         }
@@ -197,19 +197,20 @@ namespace BoxService_BackEnd.Repositories
             cmd.ExecuteNonQuery();
         }
 
-        public void UpdateStatus(int id, string status)
+        public bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
                 SET estado = @estado
-                WHERE id_presupuesto = @id", conn);
+                WHERE id_presupuesto = @id AND tenant_id = @tenant_id", conn);
 
             cmd.Parameters.AddWithValue("estado", status);
             cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
-            cmd.ExecuteNonQuery();
+            return cmd.ExecuteNonQuery() > 0;
         }
 
         /// <summary>
@@ -273,7 +274,7 @@ namespace BoxService_BackEnd.Repositories
         /// Esta es la relación correcta según el modelo nuevo:
         /// presupuestos.id_service -> services.id_service
         /// </summary>
-        public void AssignService(int budgetId, int serviceId)
+        public void AssignService(int budgetId, int tenantId, int serviceId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -283,10 +284,11 @@ namespace BoxService_BackEnd.Repositories
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
                 SET id_service = @id_service, estado = 'completed'
-                WHERE id_presupuesto = @id_presupuesto", conn);
+                WHERE id_presupuesto = @id_presupuesto AND tenant_id = @tenant_id", conn);
 
             cmd.Parameters.AddWithValue("id_service", serviceId);
             cmd.Parameters.AddWithValue("id_presupuesto", budgetId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             var rowsAffected = cmd.ExecuteNonQuery();
 
@@ -299,6 +301,7 @@ namespace BoxService_BackEnd.Repositories
         private static Budget MapRow(NpgsqlDataReader r) => new()
         {
             BudgetId = (int)r["id_presupuesto"],
+            TenantId = (int)r["tenant_id"],
             Number = r["numero"].ToString()!,
             // Npgsql mapea las columnas DATE de Postgres a DateOnly, no a DateTime.
             Date = ((DateOnly)r["fecha"]).ToString("yyyy-MM-dd"),

@@ -22,24 +22,6 @@ services:
         sync: false
       - key: Jwt__ExpiresMinutes
         value: "60"
-      - key: Jwt__Users__0__Username
-        sync: false
-      - key: Jwt__Users__0__PasswordHash
-        sync: false
-      - key: Jwt__Users__0__Role
-        sync: false
-      - key: Jwt__Users__1__Username
-        sync: false
-      - key: Jwt__Users__1__PasswordHash
-        sync: false
-      - key: Jwt__Users__1__Role
-        sync: false
-      - key: Jwt__Users__2__Username
-        sync: false
-      - key: Jwt__Users__2__PasswordHash
-        sync: false
-      - key: Jwt__Users__2__Role
-        sync: false
       - key: Cors__AllowedOrigin
         sync: false
       - key: Google__ClientId
@@ -64,24 +46,6 @@ services:
         sync: false
       - key: Jwt__ExpiresMinutes
         value: "60"
-      - key: Jwt__Users__0__Username
-        sync: false
-      - key: Jwt__Users__0__PasswordHash
-        sync: false
-      - key: Jwt__Users__0__Role
-        sync: false
-      - key: Jwt__Users__1__Username
-        sync: false
-      - key: Jwt__Users__1__PasswordHash
-        sync: false
-      - key: Jwt__Users__1__Role
-        sync: false
-      - key: Jwt__Users__2__Username
-        sync: false
-      - key: Jwt__Users__2__PasswordHash
-        sync: false
-      - key: Jwt__Users__2__Role
-        sync: false
       - key: Cors__AllowedOrigin
         sync: false
       - key: Google__ClientId
