@@ -47,6 +47,15 @@ namespace BoxService_BackEnd.Models
         public List<BudgetDetailRequest> Details { get; set; } = new();
     }
 
+    // PUT /budgets/{id}/details — reemplaza los ítems de un presupuesto
+    // que todavía no está finalizado (draft/sent/approved, no
+    // completed/rejected). Cubre tanto editar mientras espera aprobación
+    // como ajustar antes de generar el service de uno aprobado.
+    public class BudgetDetailsUpdateRequest
+    {
+        public List<BudgetDetailRequest> Details { get; set; } = new();
+    }
+
     public class BudgetStatusRequest
     {
         public string Status { get; set; } = "";
