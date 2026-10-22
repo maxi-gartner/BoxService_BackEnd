@@ -9,9 +9,9 @@ namespace BoxService_BackEnd.Services
     {
         private readonly CatalogRepository _repo = new();
 
-        public List<CatalogItem> GetAll() => _repo.GetAll();
+        public List<CatalogItem> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
-        public CatalogItem Create(CatalogItemCreateRequest req)
+        public CatalogItem Create(int tenantId, CatalogItemCreateRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Name))
                 throw new ArgumentException("name is required.");
@@ -23,7 +23,7 @@ namespace BoxService_BackEnd.Services
             if (type != "labor" && type != "part")
                 throw new ArgumentException("type must be 'labor' or 'part'.");
 
-            return _repo.Create(new CatalogItem
+            return _repo.Create(tenantId, new CatalogItem
             {
                 Name = req.Name.Trim(),
                 Type = type,
@@ -31,7 +31,7 @@ namespace BoxService_BackEnd.Services
             });
         }
 
-        public (bool ok, bool notFound, string error) Update(int id, CatalogItemUpdateRequest req)
+        public (bool ok, bool notFound, string error) Update(int id, int tenantId, CatalogItemUpdateRequest req)
         {
             if (req.Name is not null && string.IsNullOrWhiteSpace(req.Name))
                 return (false, false, "name cannot be empty.");
@@ -42,10 +42,10 @@ namespace BoxService_BackEnd.Services
             if (req.Type is not null && req.Type != "labor" && req.Type != "part")
                 return (false, false, "type must be 'labor' or 'part'.");
 
-            var updated = _repo.Update(id, req);
+            var updated = _repo.Update(id, tenantId, req);
             return updated ? (true, false, "") : (false, true, "Catalog item not found");
         }
 
-        public bool Delete(int id) => _repo.Delete(id);
+        public bool Delete(int id, int tenantId) => _repo.Delete(id, tenantId);
     }
 }

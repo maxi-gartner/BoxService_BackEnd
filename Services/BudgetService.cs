@@ -8,15 +8,15 @@ public class BudgetService
     private readonly BudgetRepository _repo = new();
     private readonly ServicesRepository _services = new();
 
-    public List<Budget> GetAll() => _repo.GetAll();
+    public List<Budget> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
-    public BudgetWithDetails? GetById(int id)
+    public BudgetWithDetails? GetById(int id, int tenantId)
     {
-        var budget = _repo.GetById(id);
+        var budget = _repo.GetById(id, tenantId);
         return budget is null ? null : new BudgetWithDetails { Budget = budget, Details = _repo.GetDetails(id) };
     }
 
-    public (bool ok, bool notFound, string error, Budget? result) Create(BudgetCreateRequest req)
+    public (bool ok, bool notFound, string error, Budget? result) Create(int tenantId, BudgetCreateRequest req)
     {
         if (req.VehicleId <= 0) return (false, false, "vehicleId is required", null);
         if (req.Details is null || req.Details.Count == 0)
@@ -32,6 +32,7 @@ public class BudgetService
         }
         var budget = new Budget
         {
+            TenantId = tenantId,
             Number = $"P-{_repo.GetNextNumber():D4}",
             VehicleId = req.VehicleId,
             Notes = req.Notes,
@@ -49,9 +50,9 @@ public class BudgetService
         return (true, false, "", budget);
     }
 
-    public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, BudgetStatusRequest req)
+    public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, int tenantId, BudgetStatusRequest req)
     {
-        var budget = _repo.GetById(id);
+        var budget = _repo.GetById(id, tenantId);
         if (budget is null) return (false, true, "Budget not found", null);
         if (req.Status is not ("sent" or "rejected" or "approved"))
             return (false, false, "Invalid status. Use: sent | rejected | approved", null);
@@ -62,21 +63,21 @@ public class BudgetService
             if (budget.Status == "rejected")
                 return (false, false, "Cannot approve a rejected budget", null);
         }
-        _repo.UpdateStatus(id, req.Status);
+        _repo.UpdateStatus(id, tenantId, req.Status);
         return (true, false, "", new { budgetId = id, status = req.Status });
     }
 
-    public (bool ok, bool notFound, string error) AssignService(int budgetId, int serviceId)
+    public (bool ok, bool notFound, string error) AssignService(int budgetId, int tenantId, int serviceId)
     {
         if (serviceId <= 0) return (false, false, "Invalid service ID");
-        var budget = _repo.GetById(budgetId);
+        var budget = _repo.GetById(budgetId, tenantId);
         if (budget is null) return (false, true, "Budget not found");
         if (budget.Status != "approved") return (false, false, "Only approved budgets can be linked to a service");
         if (budget.ServiceId is not null) return (false, false, "Budget already has a linked service");
         var service = _services.GetById(serviceId);
         if (service is null || service.VehicleId != budget.VehicleId)
             return (false, false, "Service must exist and belong to the budget vehicle");
-        _repo.AssignService(budgetId, serviceId);
+        _repo.AssignService(budgetId, tenantId, serviceId);
         return (true, false, "");
     }
 }

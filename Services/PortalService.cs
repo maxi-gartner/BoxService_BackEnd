@@ -7,15 +7,15 @@ namespace BoxService_BackEnd.Services
     // miembro del taller le manda al dueño del auto por WhatsApp.
     public class PortalService(ClientRepository clients, PortalAccessRepository access, IConfiguration configuration)
     {
-        public (bool ok, bool notFound, string error, PortalInviteResult? result) Invite(int clientId)
+        public (bool ok, bool notFound, string error, PortalInviteResult? result) Invite(int tenantId, int clientId)
         {
-            var client = clients.GetById(clientId);
+            var client = clients.GetById(clientId, tenantId);
             if (client is null) return (false, true, "Client not found", null);
 
             if (string.IsNullOrWhiteSpace(client.Phone))
                 return (false, false, "El cliente no tiene teléfono cargado — hace falta para mandarle la invitación por WhatsApp.", null);
 
-            var (token, expiresAt) = access.UpsertInvite(clientId);
+            var (token, expiresAt) = access.UpsertInvite(clientId, tenantId);
 
             var appUrl = configuration["Portal:AppUrl"]?.TrimEnd('/')
                 ?? throw new InvalidOperationException("No hay Portal:AppUrl configurada.");

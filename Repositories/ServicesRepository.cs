@@ -8,7 +8,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class ServicesRepository
     {
-        public List<Service> GetAll()
+        public List<Service> GetAll(int tenantId)
         {
             var services = new List<Service>();
 
@@ -16,11 +16,13 @@ namespace BoxService_BackEnd.Repositories
 
             const string sql = @"
                 SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
-                       proximo_km, proxima_fecha, id_vehiculo
+                       proximo_km, proxima_fecha, id_vehiculo, tenant_id, sucursal_id
                 FROM services
+                WHERE tenant_id = @tenant_id
                 ORDER BY fecha DESC;";
 
             using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("tenant_id", tenantId);
             using var reader = command.ExecuteReader();
 
             while (reader.Read())
@@ -37,12 +39,35 @@ namespace BoxService_BackEnd.Repositories
 
             const string sql = @"
                 SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
-                       proximo_km, proxima_fecha, id_vehiculo
+                       proximo_km, proxima_fecha, id_vehiculo, tenant_id, sucursal_id
                 FROM services
                 WHERE id_service = @id;";
 
             using var command = new NpgsqlCommand(sql, connection);
             command.Parameters.AddWithValue("id", id);
+
+            using var reader = command.ExecuteReader();
+
+            return reader.Read() ? MapService(reader) : null;
+        }
+
+        // Scoped: la usan las rutas públicas (Api/ServiceEndpoints.cs) para
+        // no dejar ver/tocar un service de otro tenant adivinando el ID.
+        // GetById (sin tenant) queda para los usos internos que ya validan
+        // pertenencia por otro lado (ver BudgetService.AssignService).
+        public Service? GetByIdScoped(int id, int tenantId)
+        {
+            using var connection = DatabaseConnection.GetConnection();
+
+            const string sql = @"
+                SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
+                       proximo_km, proxima_fecha, id_vehiculo, tenant_id, sucursal_id
+                FROM services
+                WHERE id_service = @id AND tenant_id = @tenant_id;";
+
+            using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("id", id);
+            command.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = command.ExecuteReader();
 
@@ -57,7 +82,7 @@ namespace BoxService_BackEnd.Repositories
 
             const string sql = @"
                 SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
-                       proximo_km, proxima_fecha, id_vehiculo
+                       proximo_km, proxima_fecha, id_vehiculo, tenant_id, sucursal_id
                 FROM services
                 WHERE id_vehiculo = @id_vehiculo
                 ORDER BY fecha DESC;";
@@ -88,7 +113,9 @@ namespace BoxService_BackEnd.Repositories
                     observaciones,
                     proximo_km,
                     proxima_fecha,
-                    id_vehiculo
+                    id_vehiculo,
+                    tenant_id,
+                    sucursal_id
                 )
                 VALUES (
                     @fecha,
@@ -97,7 +124,9 @@ namespace BoxService_BackEnd.Repositories
                     @observaciones,
                     @proximo_km,
                     @proxima_fecha,
-                    @id_vehiculo
+                    @id_vehiculo,
+                    @tenant_id,
+                    @sucursal_id
                 )
                 RETURNING id_service;";
 
@@ -111,6 +140,8 @@ namespace BoxService_BackEnd.Repositories
             command.Parameters.AddWithValue("proxima_fecha", NpgsqlTypes.NpgsqlDbType.Date,
                 service.NextDate.HasValue ? DateOnly.FromDateTime(service.NextDate.Value) : DBNull.Value);
             command.Parameters.AddWithValue("id_vehiculo", service.VehicleId);
+            command.Parameters.AddWithValue("tenant_id", service.TenantId);
+            command.Parameters.AddWithValue("sucursal_id", (object?)service.SucursalId ?? DBNull.Value);
 
             service.ServiceId = Convert.ToInt32(command.ExecuteScalar());
 
@@ -203,7 +234,12 @@ namespace BoxService_BackEnd.Repositories
                 ? null
                 : r.GetDateTime(r.GetOrdinal("proxima_fecha")),
 
-            VehicleId = r.GetInt32(r.GetOrdinal("id_vehiculo"))
+            VehicleId = r.GetInt32(r.GetOrdinal("id_vehiculo")),
+            TenantId = r.GetInt32(r.GetOrdinal("tenant_id")),
+
+            SucursalId = r.IsDBNull(r.GetOrdinal("sucursal_id"))
+                ? null
+                : r.GetInt32(r.GetOrdinal("sucursal_id"))
         };
     }
 }

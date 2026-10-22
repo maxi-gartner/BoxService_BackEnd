@@ -9,22 +9,24 @@ namespace BoxService_BackEnd.Repositories
         // vinculado a una cuenta de Google, reinvitar la resetea a
         // propósito — es una acción explícita del taller, sirve para
         // el caso "el cliente perdió acceso a su Google viejo".
-        public (string InviteToken, DateTime ExpiresAt) UpsertInvite(int clientId)
+        public (string InviteToken, DateTime ExpiresAt) UpsertInvite(int clientId, int tenantId)
         {
             var token = Guid.NewGuid().ToString("N");
             var expiresAt = DateTime.UtcNow.AddDays(7);
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                INSERT INTO client_portal_access (id_cliente, invite_token, invite_expires_at, google_sub, linked_at)
-                VALUES (@id, @token, @expires, NULL, NULL)
+                INSERT INTO client_portal_access (id_cliente, tenant_id, invite_token, invite_expires_at, google_sub, linked_at)
+                VALUES (@id, @tenant_id, @token, @expires, NULL, NULL)
                 ON CONFLICT (id_cliente) DO UPDATE
-                    SET invite_token = EXCLUDED.invite_token,
+                    SET tenant_id = EXCLUDED.tenant_id,
+                        invite_token = EXCLUDED.invite_token,
                         invite_expires_at = EXCLUDED.invite_expires_at,
                         google_sub = NULL,
                         linked_at = NULL;", conn);
 
             cmd.Parameters.AddWithValue("id", clientId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
             cmd.Parameters.AddWithValue("token", token);
             cmd.Parameters.AddWithValue("expires", expiresAt);
             cmd.ExecuteNonQuery();

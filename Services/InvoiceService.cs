@@ -11,16 +11,16 @@ namespace BoxService_BackEnd.Services
         private readonly BudgetRepository _budgetRepo = new();
         private readonly ServicesRepository _servicesRepo = new();
 
-        public List<Invoice> GetAll() => _repo.GetAll();
+        public List<Invoice> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
-        public Invoice? GetById(int id) => _repo.GetById(id);
+        public Invoice? GetById(int id, int tenantId) => _repo.GetById(id, tenantId);
 
-        public (bool ok, bool notFound, string error, Invoice? result) Create(InvoiceCreateRequest req)
+        public (bool ok, bool notFound, string error, Invoice? result) Create(int tenantId, InvoiceCreateRequest req)
         {
             if (req.ServiceId <= 0)
                 return (false, false, "serviceId is required", null);
 
-            if (_servicesRepo.GetById(req.ServiceId) is null)
+            if (_servicesRepo.GetByIdScoped(req.ServiceId, tenantId) is null)
                 return (false, false, "Service does not exist", null);
 
             if (_repo.InvoiceExistsForService(req.ServiceId))
@@ -30,7 +30,7 @@ namespace BoxService_BackEnd.Services
 
             if (req.BudgetId.HasValue)
             {
-                var budget = _budgetRepo.GetById(req.BudgetId.Value);
+                var budget = _budgetRepo.GetById(req.BudgetId.Value, tenantId);
 
                 if (budget == null)
                     return (false, false, "budgetId does not match an existing budget", null);
@@ -44,6 +44,7 @@ namespace BoxService_BackEnd.Services
 
             var invoice = new Invoice
             {
+                TenantId = tenantId,
                 Number = number,
                 Total = total,
                 Status = "issued",
@@ -58,9 +59,9 @@ namespace BoxService_BackEnd.Services
             return (true, false, "", invoice);
         }
 
-        public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, InvoiceStatusRequest req)
+        public (bool ok, bool notFound, string error, object? result) UpdateStatus(int id, int tenantId, InvoiceStatusRequest req)
         {
-            var invoice = _repo.GetById(id);
+            var invoice = _repo.GetById(id, tenantId);
 
             if (invoice == null)
                 return (false, true, "Invoice not found", null);
@@ -73,7 +74,7 @@ namespace BoxService_BackEnd.Services
             if (!Array.Exists(valid, s => s == req.Status))
                 return (false, false, "Invalid status. Use: paid | cancelled", null);
 
-            _repo.UpdateStatus(id, req.Status);
+            _repo.UpdateStatus(id, tenantId, req.Status);
 
             return (true, false, "", new { invoiceId = id, status = req.Status });
         }
