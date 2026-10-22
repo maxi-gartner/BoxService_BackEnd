@@ -35,5 +35,14 @@ public static class UserEndpoints
             var updated = service.Update(id, callerTenantId, request);
             return updated is null ? Error(404, "User not found") : Ok(UserDto.FromModel(updated));
         }));
+
+        // Soporte: el usuario se olvidó la contraseña. Mismo alcance que
+        // el PATCH de arriba — el middleware ya bloquea a "empleado".
+        app.MapPost("/users/{id:int}/reset-password", (int id, ResetPasswordRequest request, HttpContext context, UserService service) => Write(() =>
+        {
+            var callerTenantId = context.Role() == "superadmin" ? (int?)null : context.TenantId();
+            var updated = service.ResetPassword(id, callerTenantId, request.NewPassword);
+            return updated ? Ok(new { message = "Contraseña actualizada." }) : Error(404, "User not found");
+        }));
     }
 }

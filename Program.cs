@@ -148,6 +148,8 @@ builder.Services.AddScoped<TenantRepository>();
 builder.Services.AddScoped<TenantService>();
 builder.Services.AddScoped<SucursalRepository>();
 builder.Services.AddScoped<SucursalService>();
+builder.Services.AddScoped<TenantPaymentRepository>();
+builder.Services.AddScoped<TenantPaymentService>();
 
 var app = builder.Build();
 
