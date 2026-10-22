@@ -6,6 +6,7 @@ namespace BoxService_BackEnd.Models
     {
         public int VehicleId { get; set; }
         public int ClientId { get; set; }
+        public int TenantId { get; set; }
         public string Brand { get; set; } = null!;
         public string Model { get; set; } = null!;
         public int? Year { get; set; }
@@ -27,7 +28,7 @@ namespace BoxService_BackEnd.Models
         public string Plate { get; set; } = null!;
 
         // NUEVO:
-        // Permite recibir el kilometraje actual cuando se crea un vehículo.
+        // Permite recibir el kilometraje actual cuando se crea un vehÃ­culo.
         public int CurrentMileage { get; set; }
     }
 }

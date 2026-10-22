@@ -21,7 +21,7 @@ public sealed record VehicleDto(
 {
     public static VehicleDto FromModel(Vehicle vehicle) => new(
         VehicleId: vehicle.VehicleId,
-        TenantId: ClientDto.PlaceholderTenantId,
+        TenantId: vehicle.TenantId.ToString(),
         ClientId: vehicle.ClientId,
         Brand: vehicle.Brand,
         Model: vehicle.Model,

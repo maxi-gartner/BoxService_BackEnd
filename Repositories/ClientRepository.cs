@@ -8,16 +8,18 @@ namespace BoxService_BackEnd.Repositories
 {
     public class ClientRepository
     {
-        public List<Client> GetAll()
+        public List<Client> GetAll(int tenantId)
         {
             var result = new List<Client>();
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_cliente, nombre, telefono, email, activo, created_at
+                SELECT id_cliente, nombre, telefono, email, activo, created_at, tenant_id
                 FROM clientes
-                WHERE activo = TRUE
+                WHERE activo = TRUE AND tenant_id = @tenant_id
                 ORDER BY id_cliente;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -28,11 +30,29 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
+        public Client? GetById(int id, int tenantId)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT id_cliente, nombre, telefono, email, activo, created_at, tenant_id
+                FROM clientes
+                WHERE id_cliente = @id AND activo = TRUE AND tenant_id = @tenant_id;", conn);
+
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? MapClient(reader) : null;
+        }
+
+        // Sin tenant: la usa el portal del cliente (rol "customer", JWT
+        // sin tenantId) — ahí la autorización pasa por la cadena
+        // google_sub → client_portal_access, no por pertenencia a tenant.
         public Client? GetById(int id)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_cliente, nombre, telefono, email, activo, created_at
+                SELECT id_cliente, nombre, telefono, email, activo, created_at, tenant_id
                 FROM clientes
                 WHERE id_cliente = @id AND activo = TRUE;", conn);
 
@@ -42,7 +62,31 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapClient(reader) : null;
         }
 
-        public Client Create(ClientCreateRequest request)
+        // Para el panel cross-tenant de superadmin — sin filtro, con el
+        // nombre del tenant embebido.
+        public List<(Client Client, string TenantName)> GetAllAdmin()
+        {
+            var result = new List<(Client, string)>();
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT c.id_cliente, c.nombre, c.telefono, c.email, c.activo, c.created_at, c.tenant_id,
+                       t.nombre AS tenant_nombre
+                FROM clientes c
+                JOIN tenants t ON t.id_tenant = c.tenant_id
+                WHERE c.activo = TRUE
+                ORDER BY t.nombre, c.id_cliente;", conn);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((MapClient(reader), reader.GetString(reader.GetOrdinal("tenant_nombre"))));
+            }
+
+            return result;
+        }
+
+        public Client Create(int tenantId, ClientCreateRequest request)
         {
             var name = (request.Nombre ?? request.Name)!.Trim();
             var phone = (request.Telefono ?? request.Phone ?? "").Trim();
@@ -50,13 +94,14 @@ namespace BoxService_BackEnd.Repositories
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                INSERT INTO clientes (nombre, telefono, email)
-                VALUES (@nombre, @telefono, @email)
-                RETURNING id_cliente, nombre, telefono, email, activo, created_at;", conn);
+                INSERT INTO clientes (nombre, telefono, email, tenant_id)
+                VALUES (@nombre, @telefono, @email, @tenant_id)
+                RETURNING id_cliente, nombre, telefono, email, activo, created_at, tenant_id;", conn);
 
             cmd.Parameters.AddWithValue("nombre", name);
             cmd.Parameters.AddWithValue("telefono", string.IsNullOrWhiteSpace(phone) ? DBNull.Value : phone);
             cmd.Parameters.AddWithValue("email", string.IsNullOrWhiteSpace(email) ? DBNull.Value : email);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
             reader.Read();
@@ -64,7 +109,7 @@ namespace BoxService_BackEnd.Repositories
             return MapClient(reader);
         }
 
-        public List<ClientVehicle> GetVehiclesByClientId(int clientId)
+        public List<ClientVehicle> GetVehiclesByClientId(int clientId, int tenantId)
         {
             var result = new List<ClientVehicle>();
 
@@ -72,10 +117,11 @@ namespace BoxService_BackEnd.Repositories
             using var cmd = new NpgsqlCommand(@"
                 SELECT id_vehiculo, patente, marca, modelo, anio, kilometraje_actual
                 FROM vehiculos
-                WHERE id_cliente = @client_id AND activo = TRUE
+                WHERE id_cliente = @client_id AND activo = TRUE AND tenant_id = @tenant_id
                 ORDER BY id_vehiculo;", conn);
 
             cmd.Parameters.AddWithValue("client_id", clientId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -98,6 +144,7 @@ namespace BoxService_BackEnd.Repositories
                 Id = id,
                 ClientId = id,
                 ClienteId = id,
+                TenantId = r.GetInt32(r.GetOrdinal("tenant_id")),
                 Nombre = name,
                 Name = name,
                 Telefono = phone,

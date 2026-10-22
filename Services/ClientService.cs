@@ -14,20 +14,22 @@ namespace BoxService_BackEnd.Services
             _repository = repository;
         }
 
-        public List<Client> List() => _repository.GetAll();
+        public List<Client> List(int tenantId) => _repository.GetAll(tenantId);
 
-        public Client? GetById(int id) => _repository.GetById(id);
+        public Client? GetById(int id, int tenantId) => _repository.GetById(id, tenantId);
 
-        public List<ClientVehicle>? GetVehicles(int clientId)
+        public List<(Client Client, string TenantName)> ListAllAdmin() => _repository.GetAllAdmin();
+
+        public List<ClientVehicle>? GetVehicles(int clientId, int tenantId)
         {
-            var client = _repository.GetById(clientId);
+            var client = _repository.GetById(clientId, tenantId);
             if (client is null)
                 return null;
 
-            return _repository.GetVehiclesByClientId(clientId);
+            return _repository.GetVehiclesByClientId(clientId, tenantId);
         }
 
-        public Client Create(ClientCreateRequest request)
+        public Client Create(int tenantId, ClientCreateRequest request)
         {
             var name = request.Nombre ?? request.Name;
             var email = request.Email;
@@ -42,7 +44,7 @@ namespace BoxService_BackEnd.Services
                     throw new ArgumentException("Email is invalid.");
             }
 
-            return _repository.Create(request);
+            return _repository.Create(tenantId, request);
         }
     }
 }

@@ -12,18 +12,22 @@ namespace BoxService_BackEnd.Services
         private readonly ServicesRepository _repository = new();
 
         // GET /api/services
-        // Trae todos los services desde la base de datos.
-        public List<Service> GetAll() => _repository.GetAll();
+        // Trae todos los services del tenant desde la base de datos.
+        public List<Service> GetAll(int tenantId) => _repository.GetAll(tenantId);
 
-        // GET /api/services/{id}
-        // Trae un service puntual por ID.
+        // Uso interno (ej. BudgetService.AssignService) — sin filtro de
+        // tenant, el caller ya validó pertenencia por otro lado.
         public Service? GetById(int id)
         {
-            // Validaci�n b�sica: un ID 0 o negativo no sirve.
             if (id <= 0) return null;
-
-            // Si el ID est� bien, se consulta en la base.
             return _repository.GetById(id);
+        }
+
+        // GET /api/services/{id} — ruta pública, scoped al tenant del caller.
+        public Service? GetByIdForTenant(int id, int tenantId)
+        {
+            if (id <= 0) return null;
+            return _repository.GetByIdScoped(id, tenantId);
         }
 
         // GET /api/vehiculos/{id}/historial

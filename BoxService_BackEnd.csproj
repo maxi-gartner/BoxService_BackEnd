@@ -19,6 +19,19 @@
         <PackageReference Include="Supabase" Version="8.1.0" />
     </ItemGroup>
 
+    <!-- Pipeline viejo (HttpListener), de antes de la migración a ASP.NET
+         Core — Program.cs es el entry point real hoy, este cluster nunca
+         se instancia ni se ejecuta. Se excluye de la build en vez de
+         reescribirlo para que coincida con firmas nuevas (ej. tenantId
+         en los Services) porque es código muerto, no algo que siga
+         vigente. -->
+    <ItemGroup>
+        <Compile Remove="Controllers\**\*.cs" />
+        <Compile Remove="Router\**\*.cs" />
+        <Compile Remove="Server.cs" />
+        <Compile Remove="ResponseHelper.cs" />
+    </ItemGroup>
+
     <!-- Copia las migraciones SQL al directorio de compilación -->
     <ItemGroup>
         <None Update="Database\migrations\*.sql">
