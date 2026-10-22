@@ -197,6 +197,31 @@ namespace BoxService_BackEnd.Repositories
             cmd.ExecuteNonQuery();
         }
 
+        // Reemplaza todos los ítems de un presupuesto (borra y vuelve a
+        // insertar) — más simple que diffear altas/bajas/modificaciones
+        // ítem por ítem, y el caller (BudgetService.UpdateDetails) ya
+        // valida que el presupuesto no esté finalizado antes de llamarlo.
+        public void ReplaceDetails(int budgetId, List<BudgetDetail> details)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var tx = conn.BeginTransaction();
+
+            using (var del = new NpgsqlCommand(
+                "DELETE FROM detalle_presupuesto WHERE id_presupuesto = @id", conn, tx))
+            {
+                del.Parameters.AddWithValue("id", budgetId);
+                del.ExecuteNonQuery();
+            }
+
+            foreach (var detail in details)
+            {
+                detail.BudgetId = budgetId;
+                CreateDetail(detail, conn, tx);
+            }
+
+            tx.Commit();
+        }
+
         public bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();

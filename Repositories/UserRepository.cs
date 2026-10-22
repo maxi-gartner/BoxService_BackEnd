@@ -128,6 +128,24 @@ namespace BoxService_BackEnd.Repositories
             return cmd.ExecuteNonQuery() > 0;
         }
 
+        // Mismo alcance que Update: dueno solo dentro de su propio tenant
+        // (el WHERE lo garantiza), superadmin con tenantId null = cualquiera.
+        public bool UpdatePassword(int id, int? tenantId, string passwordHash)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                UPDATE usuarios
+                SET password_hash = @password_hash
+                WHERE id_usuario = @id
+                  AND (@tenant_id::int IS NULL OR id_tenant = @tenant_id);", conn);
+
+            cmd.Parameters.AddWithValue("password_hash", passwordHash);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", (object?)tenantId ?? DBNull.Value);
+
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
         public bool UsernameExists(string username)
         {
             using var conn = DatabaseConnection.GetConnection();

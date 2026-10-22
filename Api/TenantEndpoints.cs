@@ -12,12 +12,16 @@ public static class TenantEndpoints
     public static void MapTenantEndpoints(this WebApplication app)
     {
         app.MapGet("/tenants", (TenantService service) =>
-            Ok(service.List().Select(t => new
+            Ok(service.ListWithOwner().Select(row => new
             {
-                tenantId = t.TenantId,
-                name = t.Name,
-                active = t.Active,
-                createdAt = t.CreatedAt.ToString("O"),
+                tenantId = row.Tenant.TenantId,
+                name = row.Tenant.Name,
+                active = row.Tenant.Active,
+                createdAt = row.Tenant.CreatedAt.ToString("O"),
+                telefono = row.Tenant.Telefono,
+                email = row.Tenant.Email,
+                ownerName = row.OwnerName,
+                ownerUsername = row.OwnerUsername,
             }).ToArray()));
 
         app.MapPost("/tenants", (TenantCreateRequest request, TenantService service) => Write(() =>
@@ -33,8 +37,9 @@ public static class TenantEndpoints
 
         app.MapPatch("/tenants/{id:int}", (int id, TenantUpdateRequest request, TenantService service) => Write(() =>
         {
-            if (request.Active is null) return Error(400, "Nothing to update.");
-            var updated = service.SetActive(id, request.Active.Value);
+            if (request.Active is null && request.Telefono is null && request.Email is null)
+                return Error(400, "Nothing to update.");
+            var updated = service.Update(id, request);
             return updated ? Ok(new { message = "Tenant updated" }) : Error(404, "Tenant not found");
         }));
 
@@ -48,5 +53,14 @@ public static class TenantEndpoints
 
         app.MapGet("/tenants/{id:int}/sucursales", (int id, SucursalService service) =>
             Ok(service.List(id).Select(SucursalDto.FromModel).ToArray()));
+
+        // Control de pagos mensuales — historial de un taller puntual y
+        // alta/corrección del pago de un período. GET /admin/payments
+        // (ver AdminEndpoints.cs) es la vista general de todos los talleres.
+        app.MapGet("/tenants/{id:int}/payments", (int id, TenantPaymentService service) =>
+            Ok(service.GetHistory(id).Select(TenantPaymentDto.FromModel).ToArray()));
+
+        app.MapPost("/tenants/{id:int}/payments", (int id, TenantPaymentCreateRequest request, TenantPaymentService service) => Write(() =>
+            Ok(TenantPaymentDto.FromModel(service.Record(id, request)), 201)));
     }
 }

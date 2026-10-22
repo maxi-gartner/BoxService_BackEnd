@@ -31,6 +31,14 @@ public static class BudgetEndpoints
             return result.ok ? Ok(result.result!) : Error(result.notFound ? 404 : 400, result.error);
         }));
 
+        app.MapPut("/budgets/{id:int}/details", (int id, BudgetDetailsUpdateRequest request, HttpContext context, BudgetService service) => Write(() =>
+        {
+            var result = service.UpdateDetails(id, context.TenantId(), request);
+            return result.ok
+                ? Ok(new { budget = BudgetDto.FromModel(result.result!.Budget), details = result.result!.Details, total = result.result!.Total })
+                : Error(result.notFound ? 404 : 400, result.error);
+        }));
+
         app.MapPut("/budgets/{id:int}/service", (int id, AssignServiceRequest request, HttpContext context, BudgetService service) => Write(() =>
         {
             var result = service.AssignService(id, context.TenantId(), request.ServiceId);
