@@ -4,6 +4,7 @@ namespace BoxService_BackEnd.Models
     public class Invoice
     {
         public int     InvoiceId { get; set; }
+        public int     TenantId  { get; set; }
         public string  Number    { get; set; } = string.Empty; // F-0001
         public string  Date      { get; set; } = string.Empty;
         public decimal Total     { get; set; }

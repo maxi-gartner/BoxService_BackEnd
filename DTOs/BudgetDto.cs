@@ -6,6 +6,6 @@ public sealed record BudgetDto(int BudgetId, string TenantId, string Number, str
     string Status, string? Notes, int VehicleId, int? ServiceId)
 {
     public static BudgetDto FromModel(Budget value) => new(value.BudgetId,
-        ClientDto.PlaceholderTenantId, value.Number, value.Date, value.Status,
+        value.TenantId.ToString(), value.Number, value.Date, value.Status,
         value.Notes, value.VehicleId, value.ServiceId);
 }
