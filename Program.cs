@@ -152,10 +152,10 @@ builder.Services.AddScoped<TenantPaymentRepository>();
 builder.Services.AddScoped<TenantPaymentService>();
 builder.Services.AddScoped<MetricsService>();
 
-// Singleton: cachea el token de app y el listado de marcas en memoria
-// entre requests (ver MercadoLibreCatalogService).
+// Singleton: cachea los listados de marca/modelo/versión en memoria
+// entre requests (ver ArgAutosCatalogService).
 builder.Services.AddHttpClient();
-builder.Services.AddSingleton<MercadoLibreCatalogService>();
+builder.Services.AddSingleton<ArgAutosCatalogService>();
 
 var app = builder.Build();
 
