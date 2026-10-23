@@ -1,57 +1,59 @@
 # Catálogo de vehículos (Mercado Libre Argentina)
 
-Sugerencias de marca/modelo/versión al cargar un vehículo (web y
-mobile) — mejoran la precisión y evitan typos, pero **nunca bloquean**:
-si falta configurar las credenciales o la API de ML no responde, los
-tres campos siguen aceptando texto libre como antes.
+Sugerencia de **marca** al cargar un vehículo (web y mobile) — mejora la
+precisión y evita typos, pero **nunca bloquea**: si la API de ML no
+responde, el campo sigue aceptando texto libre como antes.
 
-## Cómo conseguir las credenciales
-
-1. Entrar a https://developers.mercadolibre.com.ar/ con una cuenta de
-   Mercado Libre (o crear una, es gratis).
-2. "Mis aplicaciones" → "Crear nueva aplicación". No hace falta
-   configurar Redirect URI para este uso.
-3. Copiar el **App ID** (`MercadoLibre:ClientId`) y la **Secret Key**
-   (`MercadoLibre:ClientSecret`) a `appsettings.json` (local) o a las
-   env vars `MercadoLibre__ClientId` / `MercadoLibre__ClientSecret`
-   (Render — ver `docs/DEPLOYMENT.md`).
-
-## Qué endpoints expone el backend
+## Qué endpoint expone el backend
 
 - `GET /vehicle-catalog/brands` — las ~200 marcas reales del mercado
-  argentino. **Público del lado de ML**, no necesita las credenciales
-  configuradas para funcionar.
-- `GET /vehicle-catalog/models?brandId=X` — los modelos más comunes de
-  esa marca. Necesita las credenciales (token de app).
-- `GET /vehicle-catalog/versions?brandId=X&modelId=Y` — las versiones
-  más comunes de esa marca+modelo. Mismo requisito.
+  argentino, sacadas de `GET /categories/MLA1744/attributes` (API
+  pública de ML, sin autenticación). Se cachea 24hs en memoria del
+  proceso (`MercadoLibreCatalogService`).
 
-Las tres rutas requieren sesión de staff (`RequireAuthorization()`) —
-no son datos de un tenant puntual, cualquier dueño/empleado autenticado
-puede pedirlas. El middleware de roles ya bloquea a superadmin (no
-tiene tenant, no carga vehículos).
+Requiere sesión de staff (`RequireAuthorization()`) — no es dato de un
+tenant puntual, cualquier dueño/empleado autenticado puede pedirlo.
 
-## Cómo funciona por dentro (`MercadoLibreCatalogService`)
+`GET /vehicle-catalog/models` y `GET /vehicle-catalog/versions` siguen
+existiendo (para no romper los frontends) pero devuelven siempre lista
+vacía — ver el porqué abajo. Modelo y versión quedan como campos de
+texto libre en el formulario.
 
-- Token de app vía `grant_type=client_credentials` contra
-  `https://api.mercadolibre.com/oauth/token` — **no requiere que nadie
-  inicie sesión en ML**, es un token de aplicación. Se cachea en
-  memoria del proceso y se renueva solo cuando falta menos de 5 minutos
-  para que venza (confirmado: dura ~6hs).
-- El listado de marcas se cachea 24hs en memoria (cambia casi nunca).
-- Modelo y versión usan el patrón `known_attributes` documentado por
-  ML: `POST /catalog_domains/MLA-CARS_AND_VANS/attributes/{ATRIBUTO}/
-  top_values` con body `{"known_attributes":[{"id":"BRAND","value_id":
-  "..."}]}` (y sumando `{"id":"MODEL","value_id":"..."}` para pedir
-  versión). Devuelve los valores más frecuentes en avisos de ML, no un
-  catálogo exhaustivo — por eso el frontend siempre deja escribir lo
-  que no aparezca en la lista.
+## Por qué modelo y versión quedaron sin sugerencias (investigado y descartado)
+
+ML sí documenta un endpoint para esto —
+`POST /catalog_domains/MLA-CARS_AND_VANS/attributes/{MODEL|VEHICLE_YEAR|TRIM}/top_values`
+con `known_attributes` (marca, y marca+modelo para año/versión) — pero
+requiere un token OAuth de usuario, no uno de aplicación.
+
+Se probó de punta a punta, con una app real creada en
+developers.mercadolibre.com.ar:
+
+- `client_credentials` (token de app, sin login de nadie): **no
+  soportado** por ML para este endpoint — devuelve
+  `unsupported_grant_type`.
+- `authorization_code` + PKCE (requerido por esta app): funciona, emite
+  access token válido. `refresh_token` nunca llegó a emitirse (ML
+  ignoró `scope=offline_access` en todos los intentos).
+- Con el access token válido, `catalog_domains/.../top_values` devuelve
+  **403** `PA_UNAUTHORIZED_RESULT_FROM_POLICIES` sin importar la
+  configuración de permisos probada en el panel: permisos default,
+  "Publicación y sincronización" en "Lectura" + unidad de negocio "VIS"
+  habilitada, "Tópicos" de items/catalog con todo seleccionado. Ninguna
+  combinación disponible desde el panel público de developers lo
+  destrabó.
+
+Conclusión: este endpoint necesita un nivel de acceso partner/
+certificado que ML no otorga por auto-registro estándar. Si en el
+futuro ML lo habilita para apps normales, el patrón a implementar está
+documentado arriba (`known_attributes` cascada marca→modelo→versión).
+No quedó nada de la app de ML atado al código — la app sigue existiendo
+en la cuenta de ML del usuario, simplemente sin usarse.
 
 ## Por qué no hay cascada estricta marca→modelo→versión en la UI
 
-El listado de marcas es la lista completa y real — por eso ahí sí es
-un `<select>` cerrado (con un "Otra (escribir)" por si falta alguna
-rarísima). Modelo y versión son "los más vistos en ML", no el universo
-completo, así que quedan como texto libre con sugerencias (datalist en
-web, chips en mobile) — nunca como un select que te obligue a elegir
-de una lista que puede no tener tu caso.
+El listado de marcas es el universo completo y real — por eso es un
+`<select>` cerrado (con un "Otra (escribir)" por si falta alguna
+rarísima). Modelo y versión son campos de texto libre simples, sin
+sugerencias — cualquier mejora futura ahí depende de que ML habilite
+el endpoint de catálogo para apps estándar.
