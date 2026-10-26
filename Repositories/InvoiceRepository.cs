@@ -19,6 +19,88 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
+        // status: "por-cobrar" (issued) o null/"todas" (sin filtro). Trae
+        // marca/modelo/patente del vehículo embebidos (join a través de
+        // services) para que Facturas no tenga que pedir /services y
+        // /vehicles aparte solo para armar la etiqueta de cada fila.
+        public (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+            int tenantId, int page, int pageSize, string? status)
+        {
+            var result = new List<(Invoice, int, string, string, string)>();
+            var totalCount = 0;
+
+            var statusFilter = status == "por-cobrar" ? "AND f.estado = 'issued'" : "";
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand($@"
+                SELECT f.*, v.id_vehiculo AS vehicle_id, v.patente AS vehicle_patente,
+                       v.marca AS vehicle_marca, v.modelo AS vehicle_modelo,
+                       COUNT(*) OVER() AS total_count
+                FROM facturas f
+                JOIN services s ON s.id_service = f.id_service
+                JOIN vehiculos v ON v.id_vehiculo = s.id_vehiculo
+                WHERE f.tenant_id = @tenant_id {statusFilter}
+                ORDER BY f.created_at DESC
+                LIMIT @page_size OFFSET @offset;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("page_size", pageSize);
+            cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((
+                    MapRow(reader),
+                    reader.GetInt32(reader.GetOrdinal("vehicle_id")),
+                    reader.GetString(reader.GetOrdinal("vehicle_patente")),
+                    reader.GetString(reader.GetOrdinal("vehicle_marca")),
+                    reader.GetString(reader.GetOrdinal("vehicle_modelo"))));
+                totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            }
+
+            return (result, totalCount);
+        }
+
+        // Sin paginar a propósito: un vehículo puntual nunca acumula miles
+        // de facturas propias — la usa InvoicingList (Taller) en vez de
+        // pedir la tabla global y filtrar del lado del cliente.
+        public List<Invoice> GetByVehicleId(int vehicleId)
+        {
+            var lista = new List<Invoice>();
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT f.* FROM facturas f
+                JOIN services s ON s.id_service = f.id_service
+                WHERE s.id_vehiculo = @vehicle_id
+                ORDER BY f.created_at DESC;", conn);
+            cmd.Parameters.AddWithValue("vehicle_id", vehicleId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) lista.Add(MapRow(reader));
+            return lista;
+        }
+
+        // Agregados para las tarjetas de resumen de FacturasPage — un solo
+        // COUNT/SUM en la base en vez de traer todas las facturas al
+        // frontend solo para sumarlas ahí.
+        public (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenantId)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT COUNT(*) AS total_count,
+                       COUNT(*) FILTER (WHERE estado = 'issued') AS pending_count,
+                       COALESCE(SUM(total) FILTER (WHERE estado = 'issued'), 0) AS pending_total
+                FROM facturas
+                WHERE tenant_id = @tenant_id;", conn);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            using var reader = cmd.ExecuteReader();
+            reader.Read();
+            return (
+                reader.GetInt32(reader.GetOrdinal("total_count")),
+                reader.GetInt32(reader.GetOrdinal("pending_count")),
+                reader.GetDecimal(reader.GetOrdinal("pending_total")));
+        }
+
         public Invoice? GetById(int id, int tenantId)
         {
             using var conn   = DatabaseConnection.GetConnection();

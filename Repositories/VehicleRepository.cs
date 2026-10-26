@@ -42,6 +42,52 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
+        // search: ILIKE sobre patente/marca/modelo/nombre del cliente (join
+        // contra clientes) — mismo criterio que usaba VehicleSearch a mano
+        // en el frontend, ahora resuelto server-side.
+        public (List<(Vehicle Vehicle, string? ClientName)> Items, int TotalCount) GetPaged(
+            int tenantId, int page, int pageSize, string? search)
+        {
+            var result = new List<(Vehicle, string?)>();
+            var totalCount = 0;
+
+            using var conn = DatabaseConnection.GetConnection();
+
+            using var cmd = new NpgsqlCommand(@"
+                SELECT
+                    v.id_vehiculo, v.id_cliente, v.tenant_id, v.marca, v.modelo, v.version,
+                    v.anio, v.patente, v.kilometraje_actual, v.created_at,
+                    c.nombre AS client_nombre,
+                    COUNT(*) OVER() AS total_count
+                FROM vehiculos v
+                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente
+                WHERE v.tenant_id = @tenant_id
+                  AND (@search::text IS NULL
+                       OR v.patente ILIKE '%' || @search::text || '%'
+                       OR v.marca ILIKE '%' || @search::text || '%'
+                       OR v.modelo ILIKE '%' || @search::text || '%'
+                       OR c.nombre ILIKE '%' || @search::text || '%')
+                ORDER BY v.id_vehiculo
+                LIMIT @page_size OFFSET @offset;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim());
+            cmd.Parameters.AddWithValue("page_size", pageSize);
+            cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var clientName = reader.IsDBNull(reader.GetOrdinal("client_nombre"))
+                    ? null
+                    : reader.GetString(reader.GetOrdinal("client_nombre"));
+                result.Add((MapRow(reader), clientName));
+                totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            }
+
+            return (result, totalCount);
+        }
+
         public Vehicle? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();

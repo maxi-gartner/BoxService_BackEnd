@@ -31,6 +31,47 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
+        // status: "pendientes" (draft/sent) o null/"todos" (sin filtro).
+        // Trae marca/modelo/patente del vehículo embebidos (join) para que
+        // la página de Presupuestos no tenga que pedir /vehicles aparte
+        // solo para mostrar la etiqueta de cada fila.
+        public (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+            int tenantId, int page, int pageSize, string? status)
+        {
+            var result = new List<(Budget, string, string, string)>();
+            var totalCount = 0;
+
+            var statusFilter = status == "pendientes" ? "AND p.estado IN ('draft', 'sent')" : "";
+
+            using var conn = DatabaseConnection.GetConnection();
+
+            using var cmd = new NpgsqlCommand($@"
+                SELECT p.*, v.patente AS vehicle_patente, v.marca AS vehicle_marca, v.modelo AS vehicle_modelo,
+                       COUNT(*) OVER() AS total_count
+                FROM presupuestos p
+                JOIN vehiculos v ON v.id_vehiculo = p.id_vehiculo
+                WHERE p.tenant_id = @tenant_id {statusFilter}
+                ORDER BY p.created_at DESC
+                LIMIT @page_size OFFSET @offset;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("page_size", pageSize);
+            cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((
+                    MapRow(reader),
+                    reader.GetString(reader.GetOrdinal("vehicle_patente")),
+                    reader.GetString(reader.GetOrdinal("vehicle_marca")),
+                    reader.GetString(reader.GetOrdinal("vehicle_modelo"))));
+                totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            }
+
+            return (result, totalCount);
+        }
+
         public Budget? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();

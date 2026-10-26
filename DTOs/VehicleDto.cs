@@ -18,9 +18,10 @@ public sealed record VehicleDto(
     int? Year,
     string Plate,
     int CurrentMileage,
-    string CreatedAt)
+    string CreatedAt,
+    string? ClientName = null)
 {
-    public static VehicleDto FromModel(Vehicle vehicle) => new(
+    public static VehicleDto FromModel(Vehicle vehicle, string? clientName = null) => new(
         VehicleId: vehicle.VehicleId,
         TenantId: vehicle.TenantId.ToString(),
         ClientId: vehicle.ClientId,
@@ -30,5 +31,6 @@ public sealed record VehicleDto(
         Year: vehicle.Year,
         Plate: vehicle.Plate,
         CurrentMileage: vehicle.CurrentMileage,
-        CreatedAt: vehicle.CreatedAt.ToString("O"));
+        CreatedAt: vehicle.CreatedAt.ToString("O"),
+        ClientName: clientName);
 }

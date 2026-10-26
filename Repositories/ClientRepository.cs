@@ -30,6 +30,40 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
+        // search: ILIKE sobre nombre/teléfono/email, OR entre los tres.
+        public (List<Client> Items, int TotalCount) GetPaged(int tenantId, int page, int pageSize, string? search)
+        {
+            var result = new List<Client>();
+            var totalCount = 0;
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT id_cliente, nombre, telefono, email, activo, created_at, tenant_id,
+                       COUNT(*) OVER() AS total_count
+                FROM clientes
+                WHERE activo = TRUE AND tenant_id = @tenant_id
+                  AND (@search::text IS NULL
+                       OR nombre ILIKE '%' || @search::text || '%'
+                       OR telefono ILIKE '%' || @search::text || '%'
+                       OR email ILIKE '%' || @search::text || '%')
+                ORDER BY id_cliente
+                LIMIT @page_size OFFSET @offset;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim());
+            cmd.Parameters.AddWithValue("page_size", pageSize);
+            cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(MapClient(reader));
+                totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            }
+
+            return (result, totalCount);
+        }
+
         public Client? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
