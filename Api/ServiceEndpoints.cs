@@ -9,8 +9,20 @@ public static class ServiceEndpoints
 {
     public static void MapServiceEndpoints(this WebApplication app)
     {
-        app.MapGet("/services", (HttpContext context, ServicesService service) =>
-            Ok(service.GetAll(context.TenantId()).Select(ServiceDto.FromModel).ToArray()));
+        app.MapGet("/services", (int? vehicleId, HttpContext context, ServicesService service, VehicleService vehicles) =>
+        {
+            var tenantId = context.TenantId();
+
+            if (vehicleId is int vid)
+            {
+                // El vehículo ya se confirmó del tenant del caller — mismo
+                // criterio que /vehicles/{id}/history (usa el mismo repo).
+                if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
+                return Ok(service.GetByVehicleId(vid).Select(ServiceDto.FromModel).ToArray());
+            }
+
+            return Ok(service.GetAll(tenantId).Select(ServiceDto.FromModel).ToArray());
+        });
 
         app.MapGet("/services/{id:int}", (int id, HttpContext context, ServicesService service) =>
         {

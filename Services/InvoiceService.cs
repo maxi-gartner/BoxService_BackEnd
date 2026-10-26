@@ -13,6 +13,14 @@ namespace BoxService_BackEnd.Services
 
         public List<Invoice> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
+        public (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+            int tenantId, int page, int pageSize, string? status) =>
+            _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status);
+
+        public List<Invoice> GetByVehicleId(int vehicleId) => _repo.GetByVehicleId(vehicleId);
+
+        public (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenantId) => _repo.GetStats(tenantId);
+
         public Invoice? GetById(int id, int tenantId) => _repo.GetById(id, tenantId);
 
         public (bool ok, bool notFound, string error, Invoice? result) Create(int tenantId, InvoiceCreateRequest req)
