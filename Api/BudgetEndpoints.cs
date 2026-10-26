@@ -9,8 +9,27 @@ public static class BudgetEndpoints
 {
     public static void MapBudgetEndpoints(this WebApplication app)
     {
-        app.MapGet("/budgets", (HttpContext context, BudgetService service) =>
-            Ok(service.GetAll(context.TenantId()).Select(BudgetDto.FromModel).ToArray()));
+        app.MapGet("/budgets", (int? vehicleId, int? page, int? pageSize, string? status, HttpContext context, BudgetService service, VehicleService vehicles) =>
+        {
+            var tenantId = context.TenantId();
+
+            if (vehicleId is int vid)
+            {
+                // El vehículo ya se confirmó del tenant del caller — mismo
+                // criterio que /vehicles/{id}/history.
+                if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
+                return Ok(service.GetByVehicleId(vid).Select(BudgetDto.FromModel).ToArray());
+            }
+
+            var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status);
+            return Ok(new PagedResult<BudgetDto>
+            {
+                Items = items.Select(i => BudgetDto.FromModel(i.Budget, i.Plate, i.Brand, i.Model)).ToList(),
+                Page = page ?? 1,
+                PageSize = pageSize ?? 25,
+                TotalCount = total
+            });
+        });
 
         app.MapGet("/budgets/{id:int}", (int id, HttpContext context, BudgetService service) =>
         {

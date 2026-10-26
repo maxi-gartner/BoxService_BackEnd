@@ -16,6 +16,12 @@ namespace BoxService_BackEnd.Services
 
         public List<Client> List(int tenantId) => _repository.GetAll(tenantId);
 
+        // Tope más alto que el resto (200, no 100): el picker de cliente
+        // al cargar un vehículo pide la lista completa en un combo, no
+        // una página de tabla — ver web/app/(dashboard)/vehiculos/page.tsx.
+        public (List<Client> Items, int TotalCount) ListPaged(int tenantId, int page, int pageSize, string? search) =>
+            _repository.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 200), search);
+
         public Client? GetById(int id, int tenantId) => _repository.GetById(id, tenantId);
 
         public List<(Client Client, string TenantName)> ListAllAdmin() => _repository.GetAllAdmin();

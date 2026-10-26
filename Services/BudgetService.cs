@@ -10,6 +10,15 @@ public class BudgetService
 
     public List<Budget> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
+    public (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+        int tenantId, int page, int pageSize, string? status) =>
+        _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status);
+
+    // Sin paginar a propósito: un vehículo puntual nunca acumula miles de
+    // presupuestos propios — lo usa BudgetsList (Taller) en vez de pedir
+    // la tabla global y filtrar del lado del cliente.
+    public List<Budget> GetByVehicleId(int vehicleId) => _repo.GetByVehicleId(vehicleId);
+
     public BudgetWithDetails? GetById(int id, int tenantId)
     {
         var budget = _repo.GetById(id, tenantId);

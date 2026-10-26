@@ -9,16 +9,25 @@ public static class VehicleEndpoints
 {
     public static void MapVehicleEndpoints(this WebApplication app)
     {
-        app.MapGet("/vehicles", (string? plate, HttpContext context, VehicleService service) =>
+        app.MapGet("/vehicles", (string? plate, int? page, int? pageSize, string? search, HttpContext context, VehicleService service) =>
         {
             var tenantId = context.TenantId();
-            if (string.IsNullOrWhiteSpace(plate))
-                return Results.Ok(ApiEnvelope<object>.Ok(service.List(tenantId).Select(VehicleDto.FromModel)));
+            if (!string.IsNullOrWhiteSpace(plate))
+            {
+                var vehicle = service.FindByPlate(plate, tenantId);
+                return vehicle is null
+                    ? Error(404, "Vehicle not found.")
+                    : Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
+            }
 
-            var vehicle = service.FindByPlate(plate, tenantId);
-            return vehicle is null
-                ? Error(404, "Vehicle not found.")
-                : Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
+            var (items, total) = service.ListPaged(tenantId, page ?? 1, pageSize ?? 25, search);
+            return Results.Ok(ApiEnvelope<object>.Ok(new PagedResult<VehicleDto>
+            {
+                Items = items.Select(i => VehicleDto.FromModel(i.Vehicle, i.ClientName)).ToList(),
+                Page = page ?? 1,
+                PageSize = pageSize ?? 25,
+                TotalCount = total
+            }));
         });
 
         app.MapGet("/vehicles/{id:int}", (int id, HttpContext context, VehicleService service) =>

@@ -152,6 +152,11 @@ builder.Services.AddScoped<TenantPaymentRepository>();
 builder.Services.AddScoped<TenantPaymentService>();
 builder.Services.AddScoped<MetricsService>();
 
+// Singleton: cachea los listados de marca/modelo/versión en memoria
+// entre requests (ver ArgAutosCatalogService).
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ArgAutosCatalogService>();
+
 var app = builder.Build();
 
 // ── Conexión compartida para el código viejo ──────────────────────────
@@ -343,8 +348,17 @@ app.MapGet("/auth/me", (HttpContext context, TenantRepository tenantRepository) 
 // HttpListenerRequest/Response, ahora habla el contrato REST que ya espera
 // el frontend nuevo (web/docs/API_CONTRACT.md), vía ClientDto/VehicleDto.
 
-app.MapGet("/clients", (HttpContext context, ClientService service) =>
-    ApiEnvelope<object>.Ok(service.List(context.TenantId()).Select(ClientDto.FromModel))).RequireAuthorization();
+app.MapGet("/clients", (int? page, int? pageSize, string? search, HttpContext context, ClientService service) =>
+{
+    var (items, total) = service.ListPaged(context.TenantId(), page ?? 1, pageSize ?? 25, search);
+    return ApiEnvelope<object>.Ok(new PagedResult<ClientDto>
+    {
+        Items = items.Select(ClientDto.FromModel).ToList(),
+        Page = page ?? 1,
+        PageSize = pageSize ?? 25,
+        TotalCount = total
+    });
+}).RequireAuthorization();
 
 app.MapGet("/clients/{id:int}", (int id, HttpContext context, ClientService service) =>
 {
@@ -363,7 +377,7 @@ app.MapGet("/clients/{id:int}/vehicles", (int id, HttpContext context, ClientSer
         return Results.Json(ApiEnvelope<object>.Fail(404, "Client not found."), statusCode: StatusCodes.Status404NotFound);
     }
 
-    var vehicles = vehicleRepository.GetByClientId(id, tenantId).Select(VehicleDto.FromModel);
+    var vehicles = vehicleRepository.GetByClientId(id, tenantId).Select(v => VehicleDto.FromModel(v));
     return Results.Ok(ApiEnvelope<object>.Ok(vehicles));
 }).RequireAuthorization();
 
@@ -391,6 +405,7 @@ app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();
 app.MapPortalEndpoints();
 app.MapMetricsEndpoints();
+app.MapVehicleCatalogEndpoints();
 app.MapTenantEndpoints();
 app.MapSucursalEndpoints();
 app.MapUserEndpoints();

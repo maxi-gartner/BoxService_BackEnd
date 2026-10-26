@@ -16,6 +16,10 @@ namespace BoxService_BackEnd.Services
 
         public List<Vehicle> List(int tenantId) => _repository.GetAll(tenantId);
 
+        public (List<(Vehicle Vehicle, string? ClientName)> Items, int TotalCount) ListPaged(
+            int tenantId, int page, int pageSize, string? search) =>
+            _repository.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), search);
+
         public Vehicle? GetById(int id, int tenantId) => _repository.GetById(id, tenantId);
 
         public Vehicle? FindByPlate(string plate, int tenantId) =>
@@ -52,6 +56,7 @@ namespace BoxService_BackEnd.Services
                 TenantId = tenantId,
                 Brand = request.Brand.Trim(),
                 Model = request.Model.Trim(),
+                Version = string.IsNullOrWhiteSpace(request.Version) ? null : request.Version.Trim(),
                 Year = request.Year,
                 Plate = plate,
                 CurrentMileage = request.CurrentMileage
