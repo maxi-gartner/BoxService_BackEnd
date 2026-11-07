@@ -18,7 +18,7 @@ public static class ServiceEndpoints
                 // El vehículo ya se confirmó del tenant del caller — mismo
                 // criterio que /vehicles/{id}/history (usa el mismo repo).
                 if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
-                return Ok(service.GetByVehicleId(vid).Select(ServiceDto.FromModel).ToArray());
+                return Ok(service.GetByVehicleId(vid, tenantId).Select(ServiceDto.FromModel).ToArray());
             }
 
             return Ok(service.GetAll(tenantId).Select(ServiceDto.FromModel).ToArray());

@@ -47,7 +47,7 @@ public static class VehicleEndpoints
             if (vehicles.GetById(id, context.TenantId()) is null)
                 return Error(404, "Vehicle not found.");
 
-            return Results.Ok(ApiEnvelope<object>.Ok(services.GetByVehicleId(id).Select(ServiceDto.FromModel)));
+            return Results.Ok(ApiEnvelope<object>.Ok(services.GetByVehicleId(id, context.TenantId()).Select(ServiceDto.FromModel)));
         });
 
         app.MapPost("/vehicles", (VehicleCreateRequest request, HttpContext context, VehicleService service) =>

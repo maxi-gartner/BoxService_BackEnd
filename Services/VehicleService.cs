@@ -42,6 +42,9 @@ namespace BoxService_BackEnd.Services
             if (request.CurrentMileage < 0)
                 throw new ArgumentException("Current mileage cannot be negative.");
 
+            if (new ClientRepository().GetById(request.ClientId, tenantId) is null)
+                throw new ArgumentException("Cliente no encontrado en este taller.");
+
             var plate = request.Plate.Trim().ToUpperInvariant();
 
             // La patente es única en toda la tabla (constraint de la base,

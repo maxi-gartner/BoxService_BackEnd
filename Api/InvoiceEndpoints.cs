@@ -16,7 +16,7 @@ public static class InvoiceEndpoints
             if (vehicleId is int vid)
             {
                 if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
-                return Ok(service.GetByVehicleId(vid).Select(InvoiceDto.FromModel).ToArray());
+                return Ok(service.GetByVehicleId(vid, tenantId).Select(InvoiceDto.FromModel).ToArray());
             }
 
             var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status);

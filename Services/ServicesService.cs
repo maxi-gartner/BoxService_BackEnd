@@ -32,11 +32,11 @@ namespace BoxService_BackEnd.Services
 
         // GET /api/vehiculos/{id}/historial
         // Historial de services de un vehículo puntual.
-        public List<Service> GetByVehicleId(int vehicleId)
+        public List<Service> GetByVehicleId(int vehicleId, int tenantId)
         {
             if (vehicleId <= 0) return new List<Service>();
 
-            return _repository.GetByVehicleId(vehicleId);
+            return _repository.GetByVehicleId(vehicleId, tenantId);
         }
 
         // GET /api/services/{id}/details
@@ -56,6 +56,11 @@ namespace BoxService_BackEnd.Services
 
             // 2. Validar: controlar que los datos obligatorios est�n bien.
             Validate(service);
+            if (new VehicleRepository().GetById(service.VehicleId, service.TenantId) is null)
+                throw new ArgumentException("Vehículo no encontrado en este taller.");
+            if (service.SucursalId is int branchId &&
+                new SucursalRepository().GetById(branchId, service.TenantId) is not { Active: true })
+                throw new ArgumentException("Sucursal no encontrada o inactiva en este taller.");
 
             // 3. L�gica de negocio:
             // El pr�ximo service se calcula sumando 10.000 km.
