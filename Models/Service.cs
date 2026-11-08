@@ -6,6 +6,8 @@ namespace BoxService_BackEnd.Models
     public class Service
     {
         public int ServiceId { get; set; }
+        public int TenantId { get; set; }
+        public int? SucursalId { get; set; }
         public DateTime Date { get; set; }
         public int Mileage { get; set; }
         public string ServiceType { get; set; } = string.Empty;
@@ -32,5 +34,6 @@ namespace BoxService_BackEnd.Models
         public string ServiceType { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public int VehicleId { get; set; }
+        public int? SucursalId { get; set; }
     }
 }

@@ -4,6 +4,7 @@ namespace BoxService_BackEnd.Models
     public class Budget
     {
         public int     BudgetId  { get; set; }
+        public int     TenantId  { get; set; }
         public string  Number    { get; set; } = string.Empty; // P-0001
         public string  Date      { get; set; } = string.Empty;
         public string  Status    { get; set; } = "draft";      // draft | sent | approved | rejected
@@ -43,6 +44,15 @@ namespace BoxService_BackEnd.Models
     {
         public int    VehicleId { get; set; }
         public string? Notes    { get; set; }
+        public List<BudgetDetailRequest> Details { get; set; } = new();
+    }
+
+    // PUT /budgets/{id}/details — reemplaza los ítems de un presupuesto
+    // que todavía no está finalizado (draft/sent/approved, no
+    // completed/rejected). Cubre tanto editar mientras espera aprobación
+    // como ajustar antes de generar el service de uno aprobado.
+    public class BudgetDetailsUpdateRequest
+    {
         public List<BudgetDetailRequest> Details { get; set; } = new();
     }
 

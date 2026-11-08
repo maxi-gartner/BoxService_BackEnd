@@ -55,9 +55,10 @@ había antes (ver sección Autenticación del README). Además, escribir en
   `Api/VehicleEndpoints.cs`, registrada desde `Program.cs`.
   El historial usa `ServiceDto` y conserva las consultas del servicio existente.
 
-Todos los módulos todavía usan el tenant provisional de `ClientDto`. Los
-usuarios de `Jwt:Users` tampoco tienen tenant asociado — el aislamiento
-multi-tenant real (cada taller viendo solo sus datos) sigue pendiente.
+Multi-tenant real: cada tabla de negocio tiene `tenant_id`, cada usuario
+pertenece a un tenant (salvo `superadmin`, que administra talleres en
+vez de pertenecer a uno), y cada endpoint filtra por el `tenantId` del
+JWT — ver `docs/MULTI_TENANT.md`.
 
 Para activar los módulos en el frontend, agregar `vehicles`, `budgets`,
 `services`, `invoices` y `catalog` a

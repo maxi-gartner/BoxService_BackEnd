@@ -113,11 +113,11 @@ Content-Type: application/json
 { "username": "empleado", "password": "cambiar-esta-clave" }
 ```
 
-Los roles disponibles en la configuración de desarrollo son `dueno`, `superadmin` y `empleado`.
-El rol `empleado` puede operar la aplicación, pero no modificar el catálogo; dueño y superadmin
-pueden hacerlo. Cambiá `Jwt:Key` y las credenciales de `Jwt:Users` antes de exponer el backend.
-Las contraseñas se almacenan como hashes `PasswordHasher` en la configuración; el siguiente paso
-de producción debería persistir usuarios y hashes en PostgreSQL.
+Los roles son `superadmin`, `dueno` y `empleado` — ver "Autenticación y
+multi-tenant" más abajo y `docs/MULTI_TENANT.md` para el detalle
+completo. Cambiá `Jwt:Key` antes de exponer el backend. Las cuentas
+viven en la tabla `usuarios` (contraseñas hasheadas con
+`PasswordHasher`, nunca en texto plano).
 
 ### 1. Clonar el repositorio
 
@@ -230,11 +230,14 @@ no están registrados en el pipeline nuevo. Consultar la lista actual en
 > **no** crea un service automáticamente — eso pasa desde el módulo de
 > Services, que después vincula el service creado con `PUT .../{id}/service`.
 
-### Autenticación
+### Autenticación y multi-tenant
 
-Login con JWT (`Auth/AuthService.cs`). Los usuarios son una lista fija en
-`appsettings.json` (sección `Jwt:Users`) — no hay tabla de usuarios en la
-base todavía, eso queda para cuando se arme multi-tenant de verdad.
+Login con JWT (`Auth/AuthService.cs`), contra la tabla real `usuarios`
+(ver `docs/MULTI_TENANT.md`) — ya no son cuentas fijas en
+`appsettings.json`. El JWT lleva `sub` (id de usuario), `name`
+(username), `role` (`superadmin` | `dueno` | `empleado`) y `tenantId`
+(ausente solo para `superadmin`, que administra talleres en vez de
+pertenecer a uno).
 
 ```http
 POST http://localhost:5001/auth/login
@@ -250,20 +253,23 @@ rutas, mandar el token en el header:
 Authorization: Bearer <token>
 ```
 
-Cuentas de desarrollo (`appsettings.example.json`): `dueno` / `superadmin`
-(`boxservice123`) / `empleado` — todas con contraseña `cambiar-esta-clave`
-salvo `superadmin`. Las contraseñas se guardan **hasheadas** (con
-`PasswordHasher` de ASP.NET Core Identity, no en texto plano). Para generar
-el hash de una contraseña nueva y pegarlo en `Jwt:Users`:
+Las contraseñas se guardan **hasheadas** (`PasswordHasher` de ASP.NET
+Core Identity, no en texto plano). Para generar el hash de una
+contraseña nueva (al dar de alta un tenant/usuario a mano en la base,
+por ejemplo):
 
 ```powershell
 dotnet run -- hash-password "la-contraseña-nueva"
 ```
 
-Por ahora el único permiso por rol implementado es: escribir en el
-catálogo (`POST`/`PATCH`/`DELETE /catalog/...`) requiere rol `dueno` o
-`superadmin` — `empleado` solo puede leerlo. El resto de los endpoints
-solo pide estar logueado, sin distinguir rol todavía.
+Permisos por rol:
+- `superadmin`: solo `/tenants`, `/admin/*`, `/users`, `/auth/me` — no
+  puede tocar clientes/vehículos/presupuestos/etc. de un taller
+  puntual (no tiene tenant propio).
+- `dueno`: todo lo operativo de su tenant, más alta/baja de
+  `/sucursales` y `/users` (empleados) de su propio taller.
+- `empleado`: todo lo operativo de su tenant salvo escribir en
+  `/catalog`, `/sucursales` y `/users` (eso es solo del dueño).
 
 El frontend ya manda el `Authorization: Bearer` en cada request (proxy de
 Next.js) una vez que el usuario hace login.

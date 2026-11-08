@@ -9,26 +9,47 @@ public static class ServiceEndpoints
 {
     public static void MapServiceEndpoints(this WebApplication app)
     {
-        app.MapGet("/services", (ServicesService service) => Ok(service.GetAll().Select(ServiceDto.FromModel).ToArray()));
-        app.MapGet("/services/{id:int}", (int id, ServicesService service) =>
+        app.MapGet("/services", (int? vehicleId, HttpContext context, ServicesService service, VehicleService vehicles) =>
         {
-            var value = service.GetById(id);
+            var tenantId = context.TenantId();
+
+            if (vehicleId is int vid)
+            {
+                // El vehículo ya se confirmó del tenant del caller — mismo
+                // criterio que /vehicles/{id}/history (usa el mismo repo).
+                if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
+                return Ok(service.GetByVehicleId(vid).Select(ServiceDto.FromModel).ToArray());
+            }
+
+            return Ok(service.GetAll(tenantId).Select(ServiceDto.FromModel).ToArray());
+        });
+
+        app.MapGet("/services/{id:int}", (int id, HttpContext context, ServicesService service) =>
+        {
+            var value = service.GetByIdForTenant(id, context.TenantId());
             return value is null ? Error(404, "Service not found") : Ok(ServiceDto.FromModel(value));
         });
-        app.MapGet("/services/{id:int}/details", (int id, ServicesService service) =>
-            service.GetById(id) is null ? Error(404, "Service not found") : Ok(service.GetDetails(id)));
-        app.MapPost("/services", (ServiceCreateRequest request, ServicesService service) => Write(() =>
+
+        app.MapGet("/services/{id:int}/details", (int id, HttpContext context, ServicesService service) =>
+            service.GetByIdForTenant(id, context.TenantId()) is null
+                ? Error(404, "Service not found")
+                : Ok(service.GetDetails(id)));
+
+        app.MapPost("/services", (ServiceCreateRequest request, HttpContext context, ServicesService service) => Write(() =>
             Ok(ServiceDto.FromModel(service.Create(new Service
             {
+                TenantId = context.TenantId(),
                 VehicleId = request.VehicleId,
+                SucursalId = request.SucursalId,
                 Date = request.Date,
                 Mileage = request.Mileage,
                 ServiceType = request.ServiceType,
                 Notes = request.Notes
             })), 201)));
-        app.MapPost("/services/{id:int}/details", (int id, ServiceDetailCreateRequest request, ServicesService service) => Write(() =>
+
+        app.MapPost("/services/{id:int}/details", (int id, ServiceDetailCreateRequest request, HttpContext context, ServicesService service) => Write(() =>
         {
-            if (service.GetById(id) is null) return Error(404, "Service not found");
+            if (service.GetByIdForTenant(id, context.TenantId()) is null) return Error(404, "Service not found");
             return Ok(service.CreateDetail(new ServiceDetail
             {
                 ServiceId = id,

@@ -51,21 +51,48 @@ por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 |---|---|---|
 | `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | connection string de Supabase — **la misma en dev y en prod**, ver más arriba |
 | `Jwt__Key` | `Jwt:Key` | 32+ bytes al azar, **distinta en dev y en prod** |
-| `Jwt__Users__0__Username` | `Jwt:Users[0].Username` | `superadmin` |
-| `Jwt__Users__0__PasswordHash` | `Jwt:Users[0].PasswordHash` | generado con `dotnet run -- hash-password "<pwd>"` (ver README) |
-| `Jwt__Users__0__Role` | `Jwt:Users[0].Role` | `superadmin` |
-| ...`__1__`, `__2__` | ídem para `dueno` y `empleado` | |
 | `Cors__AllowedOrigin` | (nuevo, no existe en local) | la URL del frontend de ese ambiente en Vercel |
 | `Google__ClientId` | `Google:ClientId` | OAuth Client ID de Google Cloud Console — ver `docs/PORTAL.md` |
 | `Portal__AppUrl` | `Portal:AppUrl` | la misma URL del frontend que `Cors__AllowedOrigin` |
+| `Email__Host`, `Email__Port` | `Email:Host`, `Email:Port` | servidor SMTP y puerto del proveedor de correo |
+| `Email__Username`, `Email__Password` | `Email:Username`, `Email:Password` | credenciales SMTP; nunca guardarlas en el repo |
+| `Email__FromAddress`, `Email__FromName` | `Email:FromAddress`, `Email:FromName` | remitente verificado del email |
+| `Email__EnableSsl` | `Email:EnableSsl` | `true` para SMTP con TLS |
+| `PasswordReset__FrontendUrl` | `PasswordReset:FrontendUrl` | página del frontend que consume el token de recuperación |
 
 `Jwt__Issuer`, `Jwt__Audience` y `Jwt__ExpiresMinutes` ya vienen con un
 valor por defecto en `render.yaml` — no hace falta tocarlos salvo que
 cambien a propósito.
 
+Las cuentas de staff (superadmin/dueño/empleado) ya no viven en
+secretos de Render — son filas reales en la tabla `usuarios` (ver
+`docs/MULTI_TENANT.md`). No hace falta cargar nada nuevo acá cuando se
+crea un tenant o un empleado, eso se hace desde el panel de
+administración una vez desplegado.
+
 **Supabase**: el connection string sale del dashboard de cada proyecto
 (Settings → Database → Connection string, modo *Transaction pooler* como
 ya usa el `appsettings.json` local).
+
+La recuperación de contraseña envía un enlace de un solo uso, válido por
+30 minutos. El backend guarda únicamente el hash del token y audita
+solicitudes, resultados de login, cambios de contraseña y mutaciones de la
+API (método y ruta, sin guardar cuerpos); no guarda contraseñas, tokens ni
+los emails ingresados. El endpoint de auditoría
+`GET /admin/auth-audit?limit=100&userId=<id>` requiere el JWT de
+`superadmin` y se muestra en `/admin/auditoria`. Para habilitar el email
+hay que cargar las variables SMTP y `PasswordReset__FrontendUrl` con la
+URL del frontend más `/reset-password`. Las páginas públicas del frontend
+solicitan el enlace y envían `token` y `newPassword` a los endpoints de
+recuperación del backend.
+Las solicitudes están limitadas a 5 por IP cada 15 minutos. Si el email
+no se configura o falla el proveedor, la respuesta pública sigue siendo
+genérica para no revelar si una cuenta existe; el error queda en logs y
+auditoría.
+El login tiene un límite adicional de 10 intentos por IP cada 5 minutos.
+Al cambiar una contraseña se invalidan los JWT de staff previamente
+emitidos; los usuarios deberán iniciar sesión de nuevo. Los JWT del portal
+de clientes no se ven afectados.
 
 ## Desplegar
 
@@ -79,12 +106,23 @@ ya se usa hoy.
 `dotnet run -- migrate` (ver `docs/ESTRUCTURA_BACKEND_CORE.md`) corre local,
 apuntando a la base que digas con `ConnectionStrings__DefaultConnection`:
 
-```
+```bash
 ConnectionStrings__DefaultConnection="<connection string de Supabase>" dotnet run -- migrate
+```
+
+En PowerShell:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = "<connection string de Supabase>"
+dotnet run -- migrate
 ```
 
 Es seguro correrlo más de una vez contra la misma base — todas las
 migraciones son idempotentes.
+Aplicá las migraciones antes de desplegar esta versión: el login y la
+validación de JWT necesitan la columna `usuarios.auth_version` creada por
+la migración `015_auth_auditoria_y_recuperacion.sql`; la auditoría de
+mutaciones también requiere aplicar `016_ampliar_auditoria_api.sql`.
 
 ## CORS
 

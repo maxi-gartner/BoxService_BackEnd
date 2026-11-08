@@ -7,6 +7,7 @@ namespace BoxService_BackEnd.Models
         public int Id { get; set; }
         public int ClientId { get; set; }
         public int ClienteId { get; set; }
+        public int TenantId { get; set; }
         public string Nombre { get; set; } = "";
         public string Name { get; set; } = "";
         public string Telefono { get; set; } = "";

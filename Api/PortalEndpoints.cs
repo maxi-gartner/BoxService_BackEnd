@@ -12,9 +12,9 @@ public static class PortalEndpoints
     public static void MapPortalEndpoints(this WebApplication app)
     {
         // Lado staff: genera (o renueva) la invitación de un cliente puntual.
-        app.MapPost("/clients/{id:int}/portal-invite", (int id, PortalService service) =>
+        app.MapPost("/clients/{id:int}/portal-invite", (int id, HttpContext context, PortalService service) =>
         {
-            var result = service.Invite(id);
+            var result = service.Invite(context.TenantId(), id);
             return result.ok ? Ok(result.result!) : Error(result.notFound ? 404 : 400, result.error);
         });
 

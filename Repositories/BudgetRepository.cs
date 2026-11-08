@@ -8,16 +8,18 @@ namespace BoxService_BackEnd.Repositories
 {
     public class BudgetRepository
     {
-        public List<Budget> GetAll()
+        public List<Budget> GetAll(int tenantId)
         {
             var lista = new List<Budget>();
 
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT * FROM presupuestos ORDER BY created_at DESC",
+                "SELECT * FROM presupuestos WHERE tenant_id = @tenant_id ORDER BY created_at DESC",
                 conn
             );
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
 
@@ -29,16 +31,58 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public Budget? GetById(int id)
+        // status: "pendientes" (draft/sent) o null/"todos" (sin filtro).
+        // Trae marca/modelo/patente del vehículo embebidos (join) para que
+        // la página de Presupuestos no tenga que pedir /vehicles aparte
+        // solo para mostrar la etiqueta de cada fila.
+        public (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+            int tenantId, int page, int pageSize, string? status)
+        {
+            var result = new List<(Budget, string, string, string)>();
+            var totalCount = 0;
+
+            var statusFilter = status == "pendientes" ? "AND p.estado IN ('draft', 'sent')" : "";
+
+            using var conn = DatabaseConnection.GetConnection();
+
+            using var cmd = new NpgsqlCommand($@"
+                SELECT p.*, v.patente AS vehicle_patente, v.marca AS vehicle_marca, v.modelo AS vehicle_modelo,
+                       COUNT(*) OVER() AS total_count
+                FROM presupuestos p
+                JOIN vehiculos v ON v.id_vehiculo = p.id_vehiculo
+                WHERE p.tenant_id = @tenant_id {statusFilter}
+                ORDER BY p.created_at DESC
+                LIMIT @page_size OFFSET @offset;", conn);
+
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("page_size", pageSize);
+            cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((
+                    MapRow(reader),
+                    reader.GetString(reader.GetOrdinal("vehicle_patente")),
+                    reader.GetString(reader.GetOrdinal("vehicle_marca")),
+                    reader.GetString(reader.GetOrdinal("vehicle_modelo"))));
+                totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            }
+
+            return (result, totalCount);
+        }
+
+        public Budget? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT * FROM presupuestos WHERE id_presupuesto = @id",
+                "SELECT * FROM presupuestos WHERE id_presupuesto = @id AND tenant_id = @tenant_id",
                 conn
             );
 
             cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
 
@@ -119,12 +163,6 @@ namespace BoxService_BackEnd.Repositories
             return (long)cmd.ExecuteScalar()!;
         }
 
-        public int Create(Budget b)
-        {
-            using var conn = DatabaseConnection.GetConnection();
-            return Create(b, conn, null);
-        }
-
         public int CreateWithDetails(Budget budget, List<BudgetDetail> details)
         {
             using var conn = DatabaseConnection.GetConnection();
@@ -147,14 +185,16 @@ namespace BoxService_BackEnd.Repositories
                     fecha,
                     estado,
                     observaciones,
-                    id_vehiculo
+                    id_vehiculo,
+                    tenant_id
                 )
                 VALUES (
                     @numero,
                     @fecha,
                     @estado,
                     @observaciones,
-                    @id_vehiculo
+                    @id_vehiculo,
+                    @tenant_id
                 )
                 RETURNING id_presupuesto", conn, tx);
 
@@ -163,6 +203,7 @@ namespace BoxService_BackEnd.Repositories
             cmd.Parameters.AddWithValue("estado", "draft");
             cmd.Parameters.AddWithValue("observaciones", (object?)b.Notes ?? DBNull.Value);
             cmd.Parameters.AddWithValue("id_vehiculo", b.VehicleId);
+            cmd.Parameters.AddWithValue("tenant_id", b.TenantId);
 
             return (int)cmd.ExecuteScalar()!;
         }
@@ -197,19 +238,45 @@ namespace BoxService_BackEnd.Repositories
             cmd.ExecuteNonQuery();
         }
 
-        public void UpdateStatus(int id, string status)
+        // Reemplaza todos los ítems de un presupuesto (borra y vuelve a
+        // insertar) — más simple que diffear altas/bajas/modificaciones
+        // ítem por ítem, y el caller (BudgetService.UpdateDetails) ya
+        // valida que el presupuesto no esté finalizado antes de llamarlo.
+        public void ReplaceDetails(int budgetId, List<BudgetDetail> details)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var tx = conn.BeginTransaction();
+
+            using (var del = new NpgsqlCommand(
+                "DELETE FROM detalle_presupuesto WHERE id_presupuesto = @id", conn, tx))
+            {
+                del.Parameters.AddWithValue("id", budgetId);
+                del.ExecuteNonQuery();
+            }
+
+            foreach (var detail in details)
+            {
+                detail.BudgetId = budgetId;
+                CreateDetail(detail, conn, tx);
+            }
+
+            tx.Commit();
+        }
+
+        public bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
                 SET estado = @estado
-                WHERE id_presupuesto = @id", conn);
+                WHERE id_presupuesto = @id AND tenant_id = @tenant_id", conn);
 
             cmd.Parameters.AddWithValue("estado", status);
             cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
-            cmd.ExecuteNonQuery();
+            return cmd.ExecuteNonQuery() > 0;
         }
 
         /// <summary>
@@ -273,7 +340,7 @@ namespace BoxService_BackEnd.Repositories
         /// Esta es la relación correcta según el modelo nuevo:
         /// presupuestos.id_service -> services.id_service
         /// </summary>
-        public void AssignService(int budgetId, int serviceId)
+        public void AssignService(int budgetId, int tenantId, int serviceId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -283,10 +350,11 @@ namespace BoxService_BackEnd.Repositories
             using var cmd = new NpgsqlCommand(@"
                 UPDATE presupuestos
                 SET id_service = @id_service, estado = 'completed'
-                WHERE id_presupuesto = @id_presupuesto", conn);
+                WHERE id_presupuesto = @id_presupuesto AND tenant_id = @tenant_id", conn);
 
             cmd.Parameters.AddWithValue("id_service", serviceId);
             cmd.Parameters.AddWithValue("id_presupuesto", budgetId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             var rowsAffected = cmd.ExecuteNonQuery();
 
@@ -299,6 +367,7 @@ namespace BoxService_BackEnd.Repositories
         private static Budget MapRow(NpgsqlDataReader r) => new()
         {
             BudgetId = (int)r["id_presupuesto"],
+            TenantId = (int)r["tenant_id"],
             Number = r["numero"].ToString()!,
             // Npgsql mapea las columnas DATE de Postgres a DateOnly, no a DateTime.
             Date = ((DateOnly)r["fecha"]).ToString("yyyy-MM-dd"),

@@ -3,6 +3,7 @@ namespace BoxService_BackEnd.Models
     public class CatalogItem
     {
         public int CatalogId { get; set; }
+        public int TenantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Type { get; set; } = "labor"; // labor | part
         public decimal Price { get; set; }

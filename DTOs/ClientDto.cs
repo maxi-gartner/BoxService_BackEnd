@@ -3,13 +3,12 @@ using BoxService_BackEnd.Models;
 namespace BoxService_BackEnd.DTOs;
 
 /// <summary>
-/// Forma exacta que espera el frontend nuevo (web/types/entities.ts), distinta
+/// Forma exacta que espera el frontend (web/types/entities.ts), distinta
 /// del modelo interno <see cref="Client"/> que todavía carga el doble nombre
-/// legado (Nombre/Name, Telefono/Phone) y no tiene tenantId.
-///
-/// TenantId es un placeholder fijo ("default") hasta que exista multi-tenant
-/// real en la base — se documenta así para que no se confunda con datos
-/// migrados de verdad. Sacarlo cuando llegue el modelo de tenants (Sprint 1).
+/// legado (Nombre/Name, Telefono/Phone). TenantId va como string en el
+/// contrato JSON (así era desde el placeholder "default") aunque en la
+/// base ahora es un int real — se conserva el tipo para no romper los
+/// tipos TypeScript existentes del lado del frontend.
 /// </summary>
 public sealed record ClientDto(
     int ClientId,
@@ -19,11 +18,9 @@ public sealed record ClientDto(
     string Email,
     string CreatedAt)
 {
-    public const string PlaceholderTenantId = "default";
-
     public static ClientDto FromModel(Client client) => new(
         ClientId: client.ClientId,
-        TenantId: PlaceholderTenantId,
+        TenantId: client.TenantId.ToString(),
         Name: client.Name,
         Phone: client.Phone,
         Email: client.Email,
