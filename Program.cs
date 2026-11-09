@@ -8,6 +8,7 @@ using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
+using BoxService_BackEnd.Services.Abstractions;
 using BoxService_BackEnd.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -124,6 +125,7 @@ builder.Services.AddSingleton<PostgresConnectionFactory>();
 // PostgresConnectionFactory — se migran de a uno, no hace falta
 // reescribirlos para volver a exponerlos.
 builder.Services.AddScoped<ClientRepository>();
+builder.Services.AddScoped<IClientRepository>(sp => sp.GetRequiredService<ClientRepository>());
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<VehicleService>();

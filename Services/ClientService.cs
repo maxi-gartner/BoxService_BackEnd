@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using BoxService_BackEnd.Models;
-using BoxService_BackEnd.Repositories;
+using BoxService_BackEnd.Services.Abstractions;
 
 namespace BoxService_BackEnd.Services
 {
     public class ClientService
     {
-        private readonly ClientRepository _repository;
+        private readonly IClientRepository _repository;
 
-        public ClientService(ClientRepository repository)
+        public ClientService(IClientRepository repository)
         {
             _repository = repository;
         }
