@@ -49,7 +49,7 @@ namespace BoxService_BackEnd.Repositories
                 SELECT p.*, v.patente AS vehicle_patente, v.marca AS vehicle_marca, v.modelo AS vehicle_modelo,
                        COUNT(*) OVER() AS total_count
                 FROM presupuestos p
-                JOIN vehiculos v ON v.id_vehiculo = p.id_vehiculo
+                JOIN vehiculos v ON v.id_vehiculo = p.id_vehiculo AND v.tenant_id = p.tenant_id
                 WHERE p.tenant_id = @tenant_id {statusFilter}
                 ORDER BY p.created_at DESC
                 LIMIT @page_size OFFSET @offset;", conn);
@@ -92,18 +92,19 @@ namespace BoxService_BackEnd.Repositories
         // Usado por el portal del cliente para mostrar el último
         // presupuesto de un vehículo puntual — el resto de la API no
         // necesitaba filtrar presupuestos por vehículo hasta ahora.
-        public List<Budget> GetByVehicleId(int vehicleId)
+        public List<Budget> GetByVehicleId(int vehicleId, int tenantId)
         {
             var lista = new List<Budget>();
 
             using var conn = DatabaseConnection.GetConnection();
 
             using var cmd = new NpgsqlCommand(
-                "SELECT * FROM presupuestos WHERE id_vehiculo = @id ORDER BY created_at DESC",
+                "SELECT * FROM presupuestos WHERE id_vehiculo = @id AND tenant_id = @tenant_id ORDER BY created_at DESC",
                 conn
             );
 
             cmd.Parameters.AddWithValue("id", vehicleId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = cmd.ExecuteReader();
 

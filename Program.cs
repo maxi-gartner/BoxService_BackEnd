@@ -82,6 +82,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents { OnTokenValidated = SessionValidation.Validate };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -134,6 +135,7 @@ builder.Services.AddScoped<ServiceInspectionRepository>();
 builder.Services.AddScoped<ServiceInspectionService>();
 builder.Services.AddSingleton<SupabaseStorageService>();
 builder.Services.AddScoped<ServicesService>();
+builder.Services.AddScoped<ITenantServiceAccess, TenantServiceAccess>();
 builder.Services.AddScoped<ServiceReminderRepository>();
 builder.Services.AddScoped<CatalogService>();
 

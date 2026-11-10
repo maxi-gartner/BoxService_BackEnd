@@ -18,6 +18,7 @@ public sealed class PortalAuthService(
     IConfiguration configuration,
     PortalAccessRepository access,
     ClientRepository clients,
+    TenantRepository tenants,
     ILogger<PortalAuthService> logger)
 {
     private readonly AuthOptions _jwt = jwtOptions.Value;
@@ -66,8 +67,8 @@ public sealed class PortalAuthService(
             // ningún token" de "vino uno pero no matcheó" (viejo, ya
             // consumido, vencido, o directamente mal copiado).
             logger.LogWarning(
-                "Invitación no encontrada para google_sub={GoogleSub}. inviteToken recibido: {HasToken}",
-                payload.Subject, string.IsNullOrWhiteSpace(inviteToken) ? "(vacío)" : inviteToken);
+                "Invitación de portal no válida. Se recibió un token: {HasToken}",
+                !string.IsNullOrWhiteSpace(inviteToken));
             return PortalAuthOutcome.Invalid("Necesitás una invitación de tu taller para entrar acá.");
         }
 
@@ -77,12 +78,17 @@ public sealed class PortalAuthService(
             return PortalAuthOutcome.Invalid("Ese cliente ya no existe.");
         }
 
+        var sessionVersion = access.GetSessionVersion(client.ClientId);
+        if (sessionVersion is null || tenants.GetById(client.TenantId) is not { Active: true })
+            return PortalAuthOutcome.Invalid("El acceso al portal no está habilitado.");
+
         var expiresAt = DateTime.UtcNow.AddDays(7);
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, client.ClientId.ToString()),
             new Claim("name", client.Name),
             new Claim("role", "customer"),
+            new Claim("portalSession", sessionVersion),
         };
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key)),

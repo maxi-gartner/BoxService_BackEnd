@@ -9,7 +9,7 @@ using BoxService_BackEnd.Repositories;
 
 namespace BoxService_BackEnd.Auth;
 
-public sealed class AuthService(IOptions<AuthOptions> options, UserRepository userRepository)
+public sealed class AuthService(IOptions<AuthOptions> options, UserRepository userRepository, TenantRepository tenants)
 {
     private readonly AuthOptions _options = options.Value;
     private readonly UserRepository _userRepository = userRepository;
@@ -18,7 +18,10 @@ public sealed class AuthService(IOptions<AuthOptions> options, UserRepository us
     public AuthResult? Authenticate(string username, string password)
     {
         var user = _userRepository.GetByUsername(username);
-        if (user is null)
+        if (user is null || !user.Active || user.Role is not ("superadmin" or "dueno" or "empleado")
+            || (user.Role == "superadmin" && user.TenantId is not null)
+            || (user.Role != "superadmin" && (user.TenantId is not int activeTenantId
+                || tenants.GetById(activeTenantId) is not { Active: true })))
         {
             return null;
         }
@@ -35,6 +38,7 @@ public sealed class AuthService(IOptions<AuthOptions> options, UserRepository us
             new(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
             new("name", user.Username),
             new("role", user.Role),
+            new(SessionSecurity.VersionClaim, SessionSecurity.Version(user.PasswordHash)),
         };
 
         // Ausente del todo para superadmin (no pertenece a ningún
