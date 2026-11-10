@@ -101,35 +101,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = "role",
             ClockSkew = TimeSpan.FromSeconds(30),
         };
-        options.Events = new JwtBearerEvents
-        {
-            OnTokenValidated = context =>
-            {
-                if (context.Principal?.FindFirst("role")?.Value == "customer")
-                {
-                    return Task.CompletedTask;
-                }
-
-                var subject = context.Principal?.FindFirst("sub")?.Value;
-                var version = context.Principal?.FindFirst("authVersion")?.Value;
-                if (!int.TryParse(subject, out var userId)
-                    || !int.TryParse(version, out var tokenVersion))
-                {
-                    context.Fail("Invalid authentication claims.");
-                    return Task.CompletedTask;
-                }
-
-                var user = context.HttpContext.RequestServices
-                    .GetRequiredService<UserRepository>()
-                    .GetById(userId);
-                if (user is null || !user.Active || user.AuthVersion != tokenVersion)
-                {
-                    context.Fail("Authentication is no longer valid.");
-                }
-
-                return Task.CompletedTask;
-            },
-        };
     });
 builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>

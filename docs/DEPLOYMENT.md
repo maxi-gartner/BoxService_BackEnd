@@ -119,10 +119,10 @@ dotnet run -- migrate
 
 Es seguro correrlo más de una vez contra la misma base — todas las
 migraciones son idempotentes.
-Aplicá las migraciones antes de desplegar esta versión: el login y la
-validación de JWT necesitan la columna `usuarios.auth_version` creada por
-la migración `015_auth_auditoria_y_recuperacion.sql`; la auditoría de
-mutaciones también requiere aplicar `016_ampliar_auditoria_api.sql`.
+Aplicá las migraciones antes de desplegar esta versión: el registro de
+eventos de auth y recuperación de contraseña necesitan la migración
+`018_auth_auditoria_y_recuperacion.sql`; la auditoría de mutaciones
+también requiere aplicar `019_ampliar_auditoria_api.sql`.
 
 ## CORS
 
