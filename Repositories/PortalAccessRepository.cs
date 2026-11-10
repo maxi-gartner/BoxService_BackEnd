@@ -36,6 +36,19 @@ namespace BoxService_BackEnd.Repositories
 
         // Login de vuelta: ya sabemos a qué cliente corresponde esta
         // cuenta de Google, sin necesitar el link de invitación de nuevo.
+        public string? GetSessionVersion(int clientId)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT google_sub, linked_at FROM client_portal_access
+                WHERE id_cliente = @id AND google_sub IS NOT NULL AND linked_at IS NOT NULL;", conn);
+            cmd.Parameters.AddWithValue("id", clientId);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return BoxService_BackEnd.Auth.SessionSecurity.Version(
+                reader.GetString(0) + "|" + reader.GetDateTime(1).ToUniversalTime().Ticks);
+        }
+
         public int? GetClientIdByGoogleSub(string googleSub)
         {
             using var conn = DatabaseConnection.GetConnection();

@@ -11,6 +11,7 @@ namespace BoxService_BackEnd.Models
         public string  Status    { get; set; } = "issued";     // issued | paid | cancelled
         public int     ServiceId { get; set; }
         public int?    BudgetId  { get; set; }
+        public List<InvoiceDetail> Details { get; set; } = [];
     }
 
     // DTOs de request — camelCase, igual que el resto de la API.
@@ -18,6 +19,26 @@ namespace BoxService_BackEnd.Models
     {
         public int  ServiceId { get; set; }
         public int? BudgetId  { get; set; }
+        public IReadOnlyList<InvoiceDetailRequest>? Details { get; set; }
+    }
+
+    public class InvoiceDetailRequest
+    {
+        public string Type { get; set; } = "labor";
+        public string Description { get; set; } = "";
+        public decimal Quantity { get; set; } = 1;
+        [System.Text.Json.Serialization.JsonRequired]
+        public decimal UnitPrice { get; set; }
+    }
+
+    public class InvoiceDetail
+    {
+        public int DetailId { get; set; }
+        public string Type { get; set; } = "labor";
+        public string Description { get; set; } = "";
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal Subtotal { get; set; }
     }
 
     public class InvoiceStatusRequest

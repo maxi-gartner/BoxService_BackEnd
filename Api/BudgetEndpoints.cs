@@ -18,7 +18,7 @@ public static class BudgetEndpoints
                 // El vehículo ya se confirmó del tenant del caller — mismo
                 // criterio que /vehicles/{id}/history.
                 if (vehicles.GetById(vid, tenantId) is null) return Error(404, "Vehicle not found.");
-                return Ok(service.GetByVehicleId(vid).Select(BudgetDto.FromModel).ToArray());
+                return Ok(service.GetByVehicleId(vid, tenantId).Select(BudgetDto.FromModel).ToArray());
             }
 
             var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status);

@@ -11,8 +11,12 @@ public static class ServiceInspectionEndpoints
         this WebApplication app
     )
     {
-        app.MapGet(
-            "/services/{serviceId:int}/inspection",
+        var group = app.MapGroup("/services/{serviceId:int}/inspection")
+            .RequireAuthorization(policy => policy.RequireRole("dueno", "empleado"))
+            .AddEndpointFilter<TenantServiceFilter>();
+
+        group.MapGet(
+            "",
             async (
                 int serviceId,
                 ServiceInspectionService service,
@@ -38,8 +42,8 @@ public static class ServiceInspectionEndpoints
             }
         );
 
-        app.MapPost(
-            "/services/{serviceId:int}/inspection",
+        group.MapPost(
+            "",
             async (
                 int serviceId,
                 ServiceInspectionUpsertRequest request,
@@ -97,8 +101,8 @@ public static class ServiceInspectionEndpoints
             }
         );
 
-        app.MapPatch(
-            "/services/{serviceId:int}/inspection",
+        group.MapPatch(
+            "",
             async (
                 int serviceId,
                 ServiceInspectionUpsertRequest request,
@@ -142,8 +146,8 @@ public static class ServiceInspectionEndpoints
             }
         );
 
-        app.MapPost(
-            "/services/{serviceId:int}/inspection/photos",
+        group.MapPost(
+            "/photos",
             async (
                 int serviceId,
                 HttpRequest request,
@@ -223,8 +227,8 @@ public static class ServiceInspectionEndpoints
             }
         ).DisableAntiforgery();
 
-        app.MapGet(
-            "/services/{serviceId:int}/inspection/photos/{photoId:int}/url",
+        group.MapGet(
+            "/photos/{photoId:int}/url",
             async (
                 int serviceId,
                 int photoId,
@@ -264,8 +268,8 @@ public static class ServiceInspectionEndpoints
             }
         );
 
-        app.MapDelete(
-            "/services/{serviceId:int}/inspection/photos/{photoId:int}",
+        group.MapDelete(
+            "/photos/{photoId:int}",
             async (
                 int serviceId,
                 int photoId,

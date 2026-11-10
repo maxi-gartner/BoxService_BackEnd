@@ -13,7 +13,7 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
 
-            var today = DateTime.Today;
+            var today = BoxService_BackEnd.Services.ServiceReminderRules.Today().ToDateTime(TimeOnly.MinValue);
             var monthStart = new DateTime(today.Year, today.Month, 1);
             var monthEnd = monthStart.AddMonths(1);
             var yearStart = new DateTime(today.Year, 1, 1);
@@ -151,6 +151,25 @@ namespace BoxService_BackEnd.Repositories
             }
             metrics.TopServicesByRevenue = ranked.OrderByDescending(r => r.Total).Take(8).ToList();
             metrics.TopServicesByFrequency = ranked.OrderByDescending(r => r.Count).Take(8).ToList();
+
+            // Cobros por fecha real del pago, con límites de mes/año de Argentina.
+            decimal Collected(DateTime start, DateTime end) => Scalar(@"
+                SELECT COALESCE(SUM(total), 0) FROM facturas
+                WHERE tenant_id = @t AND estado = 'paid'
+                    AND paid_at >= @start AND paid_at < @end", cmd =>
+                {
+                    cmd.Parameters.AddWithValue("t", tenantId);
+                    cmd.Parameters.AddWithValue("start", BoxService_BackEnd.Services.InvoiceRules.PeriodStartUtc(start));
+                    cmd.Parameters.AddWithValue("end", BoxService_BackEnd.Services.InvoiceRules.PeriodStartUtc(end));
+                });
+            metrics.CollectedThisMonth = Collected(monthStart, monthEnd);
+            metrics.CollectedThisYear = Collected(yearStart, yearEnd);
+            metrics.PendingCollectionTotal = Scalar(
+                "SELECT COALESCE(SUM(total), 0) FROM facturas WHERE tenant_id = @t AND estado = 'issued'",
+                cmd => cmd.Parameters.AddWithValue("t", tenantId));
+            metrics.PaidWithoutDateTotal = Scalar(
+                "SELECT COALESCE(SUM(total), 0) FROM facturas WHERE tenant_id = @t AND estado = 'paid' AND paid_at IS NULL",
+                cmd => cmd.Parameters.AddWithValue("t", tenantId));
 
             return metrics;
         }
