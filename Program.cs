@@ -86,6 +86,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents { OnTokenValidated = SessionValidation.Validate };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -198,6 +199,8 @@ builder.Services.AddScoped<ServiceInspectionRepository>();
 builder.Services.AddScoped<ServiceInspectionService>();
 builder.Services.AddSingleton<SupabaseStorageService>();
 builder.Services.AddScoped<ServicesService>();
+builder.Services.AddScoped<ITenantServiceAccess, TenantServiceAccess>();
+builder.Services.AddScoped<ServiceReminderRepository>();
 builder.Services.AddScoped<CatalogService>();
 
 // ── Portal del cliente (login con Google, ver estado del vehículo) ───
@@ -534,6 +537,7 @@ app.MapPost("/clients", (ClientCreateRequest request, HttpContext context, Clien
 app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
+app.MapServiceReminderEndpoints();
 app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();

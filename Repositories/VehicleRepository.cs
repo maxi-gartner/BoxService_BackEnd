@@ -60,7 +60,7 @@ namespace BoxService_BackEnd.Repositories
                     c.nombre AS client_nombre,
                     COUNT(*) OVER() AS total_count
                 FROM vehiculos v
-                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente
+                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente AND c.tenant_id = v.tenant_id
                 WHERE v.tenant_id = @tenant_id
                   AND (@search::text IS NULL
                        OR v.patente ILIKE '%' || @search::text || '%'

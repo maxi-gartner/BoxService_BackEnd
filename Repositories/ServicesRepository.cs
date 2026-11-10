@@ -74,7 +74,7 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapService(reader) : null;
         }
 
-        public List<Service> GetByVehicleId(int vehicleId)
+        public List<Service> GetByVehicleId(int vehicleId, int tenantId)
         {
             var services = new List<Service>();
 
@@ -84,11 +84,12 @@ namespace BoxService_BackEnd.Repositories
                 SELECT id_service, fecha, kilometraje, tipo_service, observaciones,
                        proximo_km, proxima_fecha, id_vehiculo, tenant_id, sucursal_id
                 FROM services
-                WHERE id_vehiculo = @id_vehiculo
+                WHERE id_vehiculo = @id_vehiculo AND tenant_id = @tenant_id
                 ORDER BY fecha DESC;";
 
             using var command = new NpgsqlCommand(sql, connection);
             command.Parameters.AddWithValue("id_vehiculo", vehicleId);
+            command.Parameters.AddWithValue("tenant_id", tenantId);
 
             using var reader = command.ExecuteReader();
 
@@ -147,9 +148,10 @@ namespace BoxService_BackEnd.Repositories
 
             using var mileage = new NpgsqlCommand(@"
                 UPDATE vehiculos SET kilometraje_actual = GREATEST(COALESCE(kilometraje_actual, 0), @km)
-                WHERE id_vehiculo = @id", connection, transaction);
+                WHERE id_vehiculo = @id AND tenant_id = @tenant_id", connection, transaction);
             mileage.Parameters.AddWithValue("km", service.Mileage);
             mileage.Parameters.AddWithValue("id", service.VehicleId);
+            mileage.Parameters.AddWithValue("tenant_id", service.TenantId);
             mileage.ExecuteNonQuery();
             transaction.Commit();
 

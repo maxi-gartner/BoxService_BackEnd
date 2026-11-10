@@ -5,6 +5,11 @@ namespace BoxService_BackEnd.Models
     // cómo va el negocio, no para contabilidad exacta.
     public class TenantMetrics
     {
+        // Revenue conserva el contrato anterior: facturado, no cobrado.
+        public decimal CollectedThisMonth { get; set; }
+        public decimal CollectedThisYear { get; set; }
+        public decimal PendingCollectionTotal { get; set; }
+        public decimal PaidWithoutDateTotal { get; set; }
         public decimal RevenueThisMonth { get; set; }
         public decimal RevenueThisYear { get; set; }
         public int ServicesThisMonth { get; set; }

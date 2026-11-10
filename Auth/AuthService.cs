@@ -12,6 +12,7 @@ namespace BoxService_BackEnd.Auth;
 public sealed class AuthService(
     IOptions<AuthOptions> options,
     UserRepository userRepository,
+    TenantRepository tenants,
     AuthAuditRepository auditRepository)
 {
     private readonly AuthOptions _options = options.Value;
@@ -27,9 +28,12 @@ public sealed class AuthService(
         }
 
         var user = _userRepository.GetByUsername(username);
-        if (user is null)
+        if (user is null || !user.Active || user.Role is not ("superadmin" or "dueno" or "empleado")
+            || (user.Role == "superadmin" && user.TenantId is not null)
+            || (user.Role != "superadmin" && (user.TenantId is not int activeTenantId
+                || tenants.GetById(activeTenantId) is not { Active: true })))
         {
-            auditRepository.Record("login", "failed", null, null, null, sourceIp);
+            auditRepository.Record("login", "failed", null, user?.UserId, user?.TenantId, sourceIp);
             return null;
         }
 
@@ -47,7 +51,7 @@ public sealed class AuthService(
             new(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
             new("name", user.Username),
             new("role", user.Role),
-            new("authVersion", user.AuthVersion.ToString()),
+            new(SessionSecurity.VersionClaim, SessionSecurity.Version(user.PasswordHash)),
         };
 
         // Ausente del todo para superadmin (no pertenece a ningún

@@ -40,12 +40,12 @@ public static class PortalEndpoints
             var client = clientRepository.GetById(clientId);
             if (client is null) return Error(404, "Cliente no encontrado.");
 
-            var vehicles = vehicleRepository.GetByClientId(clientId).Select(vehicle => new
+            var vehicles = vehicleRepository.GetByClientId(clientId, client.TenantId).Select(vehicle => new
             {
                 vehicle = VehicleDto.FromModel(vehicle),
                 // Historial completo, no solo lo último — "un registro de
                 // lo que le hicimos al auto".
-                budgets = budgetRepository.GetByVehicleId(vehicle.VehicleId).Select(budget =>
+                budgets = budgetRepository.GetByVehicleId(vehicle.VehicleId, client.TenantId).Where(b => b.Status != "draft").Select(budget =>
                 {
                     var details = budgetRepository.GetDetails(budget.BudgetId);
                     return new
@@ -55,7 +55,7 @@ public static class PortalEndpoints
                         total = details.Sum(d => d.Subtotal),
                     };
                 }),
-                services = servicesService.GetByVehicleId(vehicle.VehicleId).Select(ServiceDto.FromModel),
+                services = servicesService.GetByVehicleId(vehicle.VehicleId, client.TenantId).Select(ServiceDto.FromModel),
             });
 
             return Ok(new
