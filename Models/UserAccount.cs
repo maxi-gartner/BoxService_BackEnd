@@ -18,6 +18,7 @@ namespace BoxService_BackEnd.Models
         public string Role { get; set; } = string.Empty; // superadmin | dueno | empleado
         public bool Active { get; set; } = true;
         public DateTime CreatedAt { get; set; }
+        public int AuthVersion { get; set; }
     }
 
     public class UserCreateRequest

@@ -12,7 +12,7 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at
+                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at, auth_version
                 FROM usuarios
                 WHERE LOWER(username) = LOWER(@username) AND activo = TRUE;", conn);
 
@@ -26,7 +26,7 @@ namespace BoxService_BackEnd.Repositories
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at
+                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at, auth_version
                 FROM usuarios
                 WHERE id_usuario = @id;", conn);
 
@@ -42,7 +42,7 @@ namespace BoxService_BackEnd.Repositories
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at
+                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at, auth_version
                 FROM usuarios
                 WHERE id_tenant = @tenant_id
                 ORDER BY id_usuario;", conn);
@@ -66,7 +66,7 @@ namespace BoxService_BackEnd.Repositories
 
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
-                SELECT u.id_usuario, u.id_tenant, u.username, u.password_hash, u.nombre, u.email, u.role, u.activo, u.created_at,
+                SELECT u.id_usuario, u.id_tenant, u.username, u.password_hash, u.nombre, u.email, u.role, u.activo, u.created_at, u.auth_version,
                        t.nombre AS tenant_nombre
                 FROM usuarios u
                 LEFT JOIN tenants t ON t.id_tenant = u.id_tenant
@@ -91,7 +91,7 @@ namespace BoxService_BackEnd.Repositories
             using var cmd = new NpgsqlCommand(@"
                 INSERT INTO usuarios (id_tenant, username, password_hash, nombre, email, role)
                 VALUES (@tenant_id, @username, @password_hash, @nombre, @email, @role)
-                RETURNING id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at;", conn);
+                RETURNING id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at, auth_version;", conn);
 
             cmd.Parameters.AddWithValue("tenant_id", (object?)tenantId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("username", username);
@@ -135,7 +135,8 @@ namespace BoxService_BackEnd.Repositories
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 UPDATE usuarios
-                SET password_hash = @password_hash
+                SET password_hash = @password_hash,
+                    auth_version = auth_version + 1
                 WHERE id_usuario = @id
                   AND (@tenant_id::int IS NULL OR id_tenant = @tenant_id);", conn);
 
@@ -155,6 +156,28 @@ namespace BoxService_BackEnd.Repositories
             return (bool)cmd.ExecuteScalar()!;
         }
 
+        public List<UserAccount> GetActiveByEmail(string email)
+        {
+            var result = new List<UserAccount>();
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at, auth_version
+                FROM usuarios
+                WHERE LOWER(BTRIM(email)) = LOWER(@email) AND activo = TRUE
+                ORDER BY id_usuario;", conn);
+
+            cmd.Parameters.AddWithValue("email", email);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(MapRow(reader));
+            }
+
+            return result;
+        }
+
         private static UserAccount MapRow(NpgsqlDataReader r) => new()
         {
             UserId = r.GetInt32(r.GetOrdinal("id_usuario")),
@@ -166,6 +189,7 @@ namespace BoxService_BackEnd.Repositories
             Role = r.GetString(r.GetOrdinal("role")),
             Active = r.GetBoolean(r.GetOrdinal("activo")),
             CreatedAt = r.GetDateTime(r.GetOrdinal("created_at")),
+            AuthVersion = r.GetInt32(r.GetOrdinal("auth_version")),
         };
     }
 }

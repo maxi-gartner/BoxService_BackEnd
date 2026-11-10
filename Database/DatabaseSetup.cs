@@ -41,6 +41,7 @@ namespace BoxService_BackEnd.Database
                 catch (Exception ex)
                 {
                     Console.WriteLine($"  ✗ {fileName} — {ex.Message}");
+                    throw;
                 }
             }
 

@@ -1,4 +1,5 @@
 using BoxService_BackEnd.DTOs;
+using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
 using static BoxService_BackEnd.Api.ModuleResults;
 
@@ -23,5 +24,9 @@ public static class AdminEndpoints
         // puntual es GET /tenants/{id}/payments (ver TenantEndpoints.cs).
         app.MapGet("/admin/payments", (TenantPaymentService service) =>
             Ok(service.GetOverview().Select(TenantPaymentStatusDto.FromModel).ToArray()));
+
+        app.MapGet("/admin/auth-audit", (int? limit, int? userId, AuthAuditRepository repository) =>
+            Ok(repository.GetRecent(Math.Clamp(limit ?? 100, 1, 500), userId)))
+            .RequireAuthorization(policy => policy.RequireRole("superadmin"));
     }
 }
