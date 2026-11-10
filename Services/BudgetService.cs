@@ -17,7 +17,7 @@ public class BudgetService
     // Sin paginar a propósito: un vehículo puntual nunca acumula miles de
     // presupuestos propios — lo usa BudgetsList (Taller) en vez de pedir
     // la tabla global y filtrar del lado del cliente.
-    public List<Budget> GetByVehicleId(int vehicleId) => _repo.GetByVehicleId(vehicleId);
+    public List<Budget> GetByVehicleId(int vehicleId, int tenantId) => _repo.GetByVehicleId(vehicleId, tenantId);
 
     public BudgetWithDetails? GetById(int id, int tenantId)
     {
@@ -28,17 +28,10 @@ public class BudgetService
     public (bool ok, bool notFound, string error, Budget? result) Create(int tenantId, BudgetCreateRequest req)
     {
         if (req.VehicleId <= 0) return (false, false, "vehicleId is required", null);
-        if (req.Details is null || req.Details.Count == 0)
-            return (false, false, "details is required and must have at least one item", null);
-        foreach (var detail in req.Details)
-        {
-            if (detail is null || detail.Type is not ("labor" or "part"))
-                return (false, false, "Each detail requires type labor or part", null);
-            if (string.IsNullOrWhiteSpace(detail.Description))
-                return (false, false, "Each detail requires a description", null);
-            if (detail.Quantity <= 0 || detail.UnitPrice < 0)
-                return (false, false, "Quantity must be positive and unitPrice non-negative", null);
-        }
+        var error = BudgetDetailRules.Validate(req.Details);
+        if (error is not null) return (false, false, error, null);
+        if (new VehicleRepository().GetById(req.VehicleId, tenantId) is null)
+            return (false, true, "Vehículo no encontrado en este taller.", null);
         var budget = new Budget
         {
             TenantId = tenantId,
@@ -47,14 +40,7 @@ public class BudgetService
             Notes = req.Notes,
             Date = DateTime.Today.ToString("yyyy-MM-dd")
         };
-        var details = req.Details.Select(d => new BudgetDetail
-        {
-            Type = d.Type,
-            Description = d.Description.Trim(),
-            Quantity = d.Quantity,
-            UnitPrice = d.UnitPrice,
-            Subtotal = d.Quantity * d.UnitPrice
-        }).ToList();
+        var details = BudgetDetailRules.ToDetails(req.Details);
         budget.BudgetId = _repo.CreateWithDetails(budget, details);
         return (true, false, "", budget);
     }
@@ -71,26 +57,10 @@ public class BudgetService
         if (budget.Status is "completed" or "rejected")
             return (false, false, "No se puede editar un presupuesto finalizado.", null);
 
-        if (req.Details is null || req.Details.Count == 0)
-            return (false, false, "details is required and must have at least one item", null);
-        foreach (var detail in req.Details)
-        {
-            if (detail is null || detail.Type is not ("labor" or "part"))
-                return (false, false, "Each detail requires type labor or part", null);
-            if (string.IsNullOrWhiteSpace(detail.Description))
-                return (false, false, "Each detail requires a description", null);
-            if (detail.Quantity <= 0 || detail.UnitPrice < 0)
-                return (false, false, "Quantity must be positive and unitPrice non-negative", null);
-        }
+        var error = BudgetDetailRules.Validate(req.Details);
+        if (error is not null) return (false, false, error, null);
 
-        var details = req.Details.Select(d => new BudgetDetail
-        {
-            Type = d.Type,
-            Description = d.Description.Trim(),
-            Quantity = d.Quantity,
-            UnitPrice = d.UnitPrice,
-            Subtotal = d.Quantity * d.UnitPrice
-        }).ToList();
+        var details = BudgetDetailRules.ToDetails(req.Details);
 
         _repo.ReplaceDetails(id, details);
 
@@ -101,6 +71,7 @@ public class BudgetService
     {
         var budget = _repo.GetById(id, tenantId);
         if (budget is null) return (false, true, "Budget not found", null);
+        if (budget.Status == "completed") return (false, false, "No se puede cambiar el estado de un presupuesto finalizado.", null);
         if (req.Status is not ("sent" or "rejected" or "approved"))
             return (false, false, "Invalid status. Use: sent | rejected | approved", null);
         if (req.Status == "approved")
@@ -121,7 +92,7 @@ public class BudgetService
         if (budget is null) return (false, true, "Budget not found");
         if (budget.Status != "approved") return (false, false, "Only approved budgets can be linked to a service");
         if (budget.ServiceId is not null) return (false, false, "Budget already has a linked service");
-        var service = _services.GetById(serviceId);
+        var service = _services.GetByIdScoped(serviceId, tenantId);
         if (service is null || service.VehicleId != budget.VehicleId)
             return (false, false, "Service must exist and belong to the budget vehicle");
         _repo.AssignService(budgetId, tenantId, serviceId);

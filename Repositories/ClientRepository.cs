@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using BoxService_BackEnd.Database;
 using BoxService_BackEnd.Models;
+using BoxService_BackEnd.Services.Abstractions;
 using Npgsql;
 
 namespace BoxService_BackEnd.Repositories
 {
-    public class ClientRepository
+    public class ClientRepository : IClientRepository
     {
         public List<Client> GetAll(int tenantId)
         {

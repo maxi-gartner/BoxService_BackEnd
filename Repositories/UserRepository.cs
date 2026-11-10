@@ -155,6 +155,28 @@ namespace BoxService_BackEnd.Repositories
             return (bool)cmd.ExecuteScalar()!;
         }
 
+        public List<UserAccount> GetActiveByEmail(string email)
+        {
+            var result = new List<UserAccount>();
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                SELECT id_usuario, id_tenant, username, password_hash, nombre, email, role, activo, created_at
+                FROM usuarios
+                WHERE LOWER(BTRIM(email)) = LOWER(@email) AND activo = TRUE
+                ORDER BY id_usuario;", conn);
+
+            cmd.Parameters.AddWithValue("email", email);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(MapRow(reader));
+            }
+
+            return result;
+        }
+
         private static UserAccount MapRow(NpgsqlDataReader r) => new()
         {
             UserId = r.GetInt32(r.GetOrdinal("id_usuario")),

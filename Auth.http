@@ -1,0 +1,23 @@
+@baseUrl = http://localhost:5001
+@superadminToken = reemplazar-por-un-jwt-de-superadmin
+
+### Request a password reset email
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "usuario@example.com"
+}
+
+### Complete a password reset with the token from the email
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "token-from-email",
+  "newPassword": "una-clave-nueva"
+}
+
+### Read recent authentication audit events (superadmin bearer token required)
+GET {{baseUrl}}/admin/auth-audit?limit=100
+Authorization: Bearer {{superadminToken}}

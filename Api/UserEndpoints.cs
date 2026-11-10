@@ -1,5 +1,6 @@
 using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
+using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
 using static BoxService_BackEnd.Api.ModuleResults;
 
@@ -38,11 +39,37 @@ public static class UserEndpoints
 
         // Soporte: el usuario se olvidó la contraseña. Mismo alcance que
         // el PATCH de arriba — el middleware ya bloquea a "empleado".
-        app.MapPost("/users/{id:int}/reset-password", (int id, ResetPasswordRequest request, HttpContext context, UserService service) => Write(() =>
+        app.MapPost("/users/{id:int}/reset-password", (int id, ResetPasswordRequest request, HttpContext context, UserService service, AuthAuditRepository auditRepository) => Write(() =>
         {
             var callerTenantId = context.Role() == "superadmin" ? (int?)null : context.TenantId();
-            var updated = service.ResetPassword(id, callerTenantId, request.NewPassword);
-            return updated ? Ok(new { message = "Contraseña actualizada." }) : Error(404, "User not found");
+            var actorId = int.TryParse(context.User.FindFirst("sub")?.Value, out var parsedActorId)
+                ? parsedActorId
+                : (int?)null;
+
+            try
+            {
+                var updated = service.ResetPassword(id, callerTenantId, request.NewPassword);
+                auditRepository.Record(
+                    "admin_password_reset",
+                    updated ? "succeeded" : "target_not_found",
+                    actorId,
+                    id,
+                    callerTenantId,
+                    context.Connection.RemoteIpAddress?.ToString());
+
+                return updated ? Ok(new { message = "Contraseña actualizada." }) : Error(404, "User not found");
+            }
+            catch (ArgumentException)
+            {
+                auditRepository.Record(
+                    "admin_password_reset",
+                    "invalid_password",
+                    actorId,
+                    id,
+                    callerTenantId,
+                    context.Connection.RemoteIpAddress?.ToString());
+                throw;
+            }
         }));
     }
 }

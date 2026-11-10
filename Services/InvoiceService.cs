@@ -17,7 +17,7 @@ namespace BoxService_BackEnd.Services
             int tenantId, int page, int pageSize, string? status) =>
             _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status);
 
-        public List<Invoice> GetByVehicleId(int vehicleId) => _repo.GetByVehicleId(vehicleId);
+        public List<Invoice> GetByVehicleId(int vehicleId, int tenantId) => _repo.GetByVehicleId(vehicleId, tenantId);
 
         public (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenantId) => _repo.GetStats(tenantId);
 
@@ -28,24 +28,35 @@ namespace BoxService_BackEnd.Services
             if (req.ServiceId <= 0)
                 return (false, false, "serviceId is required", null);
 
-            if (_servicesRepo.GetByIdScoped(req.ServiceId, tenantId) is null)
+            var service = _servicesRepo.GetByIdScoped(req.ServiceId, tenantId);
+            if (service is null)
                 return (false, false, "Service does not exist", null);
 
             if (_repo.InvoiceExistsForService(req.ServiceId))
                 return (false, false, "This service already has an invoice", null);
 
-            decimal total = 0;
+            if (new VehicleRepository().GetById(service.VehicleId, tenantId) is null)
+                return (false, true, "Vehículo no encontrado en este taller.", null);
 
-            if (req.BudgetId.HasValue)
-            {
-                var budget = _budgetRepo.GetById(req.BudgetId.Value, tenantId);
+            // Si el service ya tiene presupuesto, usarlo aunque el caller omita su ID.
+            var budget = req.BudgetId is int budgetId
+                ? _budgetRepo.GetById(budgetId, tenantId)
+                : _budgetRepo.GetByVehicleId(service.VehicleId, tenantId).FirstOrDefault(b => b.ServiceId == service.ServiceId);
+            if (req.BudgetId.HasValue && budget is null)
+                return (false, true, "Presupuesto no encontrado en este taller.", null);
+            if (budget is not null && req.Details is { Count: > 0 })
+                return (false, false, "Este service tiene presupuesto: los conceptos e importes se toman de él.", null);
 
-                if (budget == null)
-                    return (false, false, "budgetId does not match an existing budget", null);
-
-                foreach (var d in _budgetRepo.GetDetails(req.BudgetId.Value))
-                    total += d.Subtotal;
-            }
+            // Calcular siempre en el servidor; nunca aceptar total/subtotal del navegador.
+            var requests = budget is null ? req.Details : _budgetRepo.GetDetails(budget.BudgetId)
+                .Select(d => new InvoiceDetailRequest { Type = d.Type, Description = d.Description,
+                    Quantity = d.Quantity, UnitPrice = d.UnitPrice }).ToList();
+            List<InvoiceDetail> details;
+            try { details = InvoiceRules.BuildDetails(requests); }
+            catch (ArgumentException error) { return (false, false, error.Message, null); }
+            var total = details.Sum(d => d.Subtotal);
+            var validationError = InvoiceRules.Validate(service, budget, tenantId, total);
+            if (validationError is not null) return (false, false, validationError, null);
 
             var nro = _repo.GetNextNumber();
             var number = $"F-{nro:D4}";
@@ -57,7 +68,8 @@ namespace BoxService_BackEnd.Services
                 Total = total,
                 Status = "issued",
                 ServiceId = req.ServiceId,
-                BudgetId = req.BudgetId
+                BudgetId = budget?.BudgetId,
+                Details = details
             };
 
             var id = _repo.CreateWithTransaction(invoice);
@@ -82,7 +94,8 @@ namespace BoxService_BackEnd.Services
             if (!Array.Exists(valid, s => s == req.Status))
                 return (false, false, "Invalid status. Use: paid | cancelled", null);
 
-            _repo.UpdateStatus(id, tenantId, req.Status);
+            if (!_repo.UpdateStatus(id, tenantId, req.Status))
+                return (false, false, "La factura cambió de estado. Actualizá la pantalla.", null);
 
             return (true, false, "", new { invoiceId = id, status = req.Status });
         }

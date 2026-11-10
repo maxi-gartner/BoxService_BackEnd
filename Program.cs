@@ -8,9 +8,12 @@ using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Services;
+using BoxService_BackEnd.Services.Abstractions;
 using BoxService_BackEnd.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,6 +77,8 @@ if (string.IsNullOrWhiteSpace(authOptions.Key) || Encoding.UTF8.GetByteCount(aut
 }
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.Configure<PasswordResetOptions>(builder.Configuration.GetSection("PasswordReset"));
 // Scoped, no Singleton: AuthService ahora depende de UserRepository
 // (consulta la tabla "usuarios"), y un singleton no puede depender de un
 // servicio scoped.
@@ -82,6 +87,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents { OnTokenValidated = SessionValidation.Validate };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -97,6 +103,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            ApiEnvelope<object>.Fail(429, "Demasiadas solicitudes. Intentá nuevamente más tarde."),
+            cancellationToken);
+    };
+
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+    options.AddPolicy("password-recovery", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+});
 
 // Cors:AllowedOrigin (env var Cors__AllowedOrigin) restringe el origen una
 // vez que hay un frontend público real que proteger (Vercel). Sin setear,
@@ -124,6 +161,7 @@ builder.Services.AddSingleton<PostgresConnectionFactory>();
 // PostgresConnectionFactory — se migran de a uno, no hace falta
 // reescribirlos para volver a exponerlos.
 builder.Services.AddScoped<ClientRepository>();
+builder.Services.AddScoped<IClientRepository>(sp => sp.GetRequiredService<ClientRepository>());
 builder.Services.AddScoped<ClientService>();
 builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<VehicleService>();
@@ -134,6 +172,8 @@ builder.Services.AddScoped<ServiceInspectionRepository>();
 builder.Services.AddScoped<ServiceInspectionService>();
 builder.Services.AddSingleton<SupabaseStorageService>();
 builder.Services.AddScoped<ServicesService>();
+builder.Services.AddScoped<ITenantServiceAccess, TenantServiceAccess>();
+builder.Services.AddScoped<ServiceReminderRepository>();
 builder.Services.AddScoped<CatalogService>();
 
 // ── Portal del cliente (login con Google, ver estado del vehículo) ───
@@ -143,7 +183,11 @@ builder.Services.AddScoped<PortalAuthService>();
 
 // ── Multi-tenant: tenants, sucursales, usuarios reales ────────────────
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<AuthAuditRepository>();
+builder.Services.AddScoped<PasswordResetRepository>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<PasswordRecoveryService>();
 builder.Services.AddScoped<TenantRepository>();
 builder.Services.AddScoped<TenantService>();
 builder.Services.AddScoped<SucursalRepository>();
@@ -187,7 +231,9 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
+app.UseRouting();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -203,6 +249,7 @@ app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
     var isPublicRoute = path == "" || path.StartsWith("/health") || path == "/auth/login"
+        || path == "/auth/forgot-password" || path == "/auth/reset-password" || path == "/auth/logout"
         || path == "/portal/auth/google";
 
     if (!isPublicRoute && context.User.Identity?.IsAuthenticated != true)
@@ -286,6 +333,8 @@ app.Use(async (context, next) =>
     await next();
 });
 
+app.UseMiddleware<ApiMutationAuditMiddleware>();
+
 app.MapGet("/", () => ApiEnvelope<object>.Ok(new
 {
     name = "BoxService API",
@@ -319,13 +368,74 @@ app.MapGet("/health", async (
     }
 });
 
-app.MapPost("/auth/login", (LoginRequest request, AuthService authService) =>
+app.MapPost("/auth/login", (LoginRequest request, HttpContext context, AuthService authService) =>
 {
-    var result = authService.Authenticate(request.Username, request.Password);
+    var result = authService.Authenticate(
+        request.Username,
+        request.Password,
+        context.Connection.RemoteIpAddress?.ToString());
     return result is null
         ? Results.Json(ApiEnvelope<object>.Fail(401, "Usuario o contraseña inválidos."), statusCode: StatusCodes.Status401Unauthorized)
         : Results.Ok(ApiEnvelope<object>.Ok(result));
-});
+}).RequireRateLimiting("login");
+
+app.MapPost("/auth/logout", (HttpContext context, AuthAuditRepository auditRepository) =>
+{
+    var actorId = int.TryParse(context.User.FindFirst("sub")?.Value, out var parsedActorId)
+        ? parsedActorId
+        : (int?)null;
+    auditRepository.Record(
+        "logout",
+        "succeeded",
+        actorId,
+        actorId,
+        context.TenantIdOrNull(),
+        context.Connection.RemoteIpAddress?.ToString());
+    return Results.Ok(ApiEnvelope<object>.Ok(new { message = "logged out" }));
+}).RequireAuthorization(policy => policy.RequireRole("dueno", "empleado", "superadmin"));
+
+app.MapPost("/auth/forgot-password", async (
+    ForgotPasswordRequest request,
+    HttpContext context,
+    PasswordRecoveryService recoveryService,
+    CancellationToken cancellationToken) =>
+{
+    await recoveryService.RequestResetAsync(
+        request.Email,
+        context.Connection.RemoteIpAddress?.ToString(),
+        cancellationToken);
+
+    return Results.Accepted(value: ApiEnvelope<object>.Ok(new
+    {
+        message = "Si existe una cuenta asociada, recibirás instrucciones para recuperar la contraseña."
+    }));
+}).RequireRateLimiting("password-recovery");
+
+app.MapPost("/auth/reset-password", (
+    CompletePasswordResetRequest request,
+    HttpContext context,
+    PasswordRecoveryService recoveryService) =>
+{
+    try
+    {
+        var completed = recoveryService.CompleteReset(
+            request.Token,
+            request.NewPassword,
+            context.Connection.RemoteIpAddress?.ToString());
+
+        return completed
+            ? Results.Ok(ApiEnvelope<object>.Ok(new { message = "Contraseña actualizada." }))
+            : Results.Json(
+                ApiEnvelope<object>.Fail(400, "El enlace es inválido o venció."),
+                statusCode: StatusCodes.Status400BadRequest);
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.Json(
+            ApiEnvelope<object>.Fail(400, exception.Message),
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+}).RequireRateLimiting("password-recovery");
 
 app.MapGet("/auth/me", (HttpContext context, TenantRepository tenantRepository) =>
 {
@@ -400,6 +510,7 @@ app.MapPost("/clients", (ClientCreateRequest request, HttpContext context, Clien
 app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
+app.MapServiceReminderEndpoints();
 app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();

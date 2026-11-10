@@ -32,6 +32,14 @@
         <Compile Remove="ResponseHelper.cs" />
     </ItemGroup>
 
+    <!-- El proyecto web vive en la raíz: no incluir el proyecto de pruebas. -->
+    <ItemGroup>
+        <Compile Remove="tests/**" />
+        <Content Remove="tests/**" />
+        <None Remove="tests/**" />
+        <EmbeddedResource Remove="tests/**" />
+    </ItemGroup>
+
     <!-- Copia las migraciones SQL al directorio de compilación -->
     <ItemGroup>
         <None Update="Database\migrations\*.sql">
