@@ -2,10 +2,9 @@
 
 ## Preparación
 
-Aplicar manualmente la migración 016_fecha_cobro_facturas.sql antes de usar
-Cobrar o Métricas. Para facturar y consultar conceptos aplicar además la migración
-017_crear_detalle_factura.sql, después de que el equipo apruebe el esquema. No se
-ejecutan estas migraciones automáticamente. No completa fechas históricas ni modifica importes existentes.
+Las migraciones 016_fecha_cobro_facturas.sql y 017_crear_detalle_factura.sql se
+aplican solas como todas las demás (`dotnet run -- migrate` corre cada `.sql` de
+`Database/migrations/` en orden, son idempotentes). No completa fechas históricas ni modifica importes existentes.
 Las facturas ya cobradas sin fecha se informan como "sin fecha registrada" y no
 se asignan artificialmente a ningún mes/año. Las facturas de cero existentes
 deben revisarse manualmente; esta corrección no las altera.

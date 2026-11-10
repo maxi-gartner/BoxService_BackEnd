@@ -28,10 +28,10 @@ public class BudgetService
     public (bool ok, bool notFound, string error, Budget? result) Create(int tenantId, BudgetCreateRequest req)
     {
         if (req.VehicleId <= 0) return (false, false, "vehicleId is required", null);
-        if (new VehicleRepository().GetById(req.VehicleId, tenantId) is null)
-            return (false, true, "Vehículo no encontrado en este taller.", null);
         var error = BudgetDetailRules.Validate(req.Details);
         if (error is not null) return (false, false, error, null);
+        if (new VehicleRepository().GetById(req.VehicleId, tenantId) is null)
+            return (false, true, "Vehículo no encontrado en este taller.", null);
         var budget = new Budget
         {
             TenantId = tenantId,

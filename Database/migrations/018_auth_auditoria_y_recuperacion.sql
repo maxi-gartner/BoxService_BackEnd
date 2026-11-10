@@ -1,9 +1,6 @@
 -- Registra eventos de autenticación sin guardar contraseñas, tokens ni
 -- direcciones de correo ingresadas en solicitudes no asociadas a usuarios.
 
-ALTER TABLE usuarios
-    ADD COLUMN IF NOT EXISTS auth_version INT NOT NULL DEFAULT 0;
-
 CREATE INDEX IF NOT EXISTS idx_usuarios_email_normalized
     ON usuarios(LOWER(BTRIM(email))) WHERE email IS NOT NULL;
 

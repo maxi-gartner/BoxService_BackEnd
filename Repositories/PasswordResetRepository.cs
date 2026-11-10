@@ -64,8 +64,7 @@ public sealed class PasswordResetRepository
                 RETURNING user_id
             )
             UPDATE usuarios AS u
-            SET password_hash = @password_hash,
-                auth_version = auth_version + 1
+            SET password_hash = @password_hash
             FROM consumed
             WHERE u.id_usuario = consumed.user_id
               AND u.activo = TRUE
