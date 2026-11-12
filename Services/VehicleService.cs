@@ -49,9 +49,25 @@ namespace BoxService_BackEnd.Services
 
             // La patente es única en toda la tabla (constraint de la base,
             // de antes del multi-tenant) — el chequeo de unicidad es
-            // global a propósito, no por tenant.
-            if (_repository.PlateExistsAnywhere(plate))
+            // global a propósito, no por tenant. Si el vehículo existente
+            // es de ESTE taller, devolvemos quién es el dueño actual para
+            // poder ofrecer una transferencia en vez de bloquear sin más
+            // (caso típico: el auto cambió de dueño). Si es de otro
+            // taller, seguimos bloqueando sin exponer datos ajenos.
+            var existing = _repository.GetByPlateAnywhere(plate);
+            if (existing is not null)
+            {
+                var (existingVehicle, existingClientName) = existing.Value;
+                if (existingVehicle.TenantId == tenantId)
+                {
+                    throw new VehiclePlateConflictException(
+                        existingVehicle.VehicleId,
+                        existingVehicle.ClientId,
+                        existingClientName ?? $"cliente #{existingVehicle.ClientId}");
+                }
+
                 throw new InvalidOperationException("A vehicle with that plate already exists.");
+            }
 
             var vehicle = new Vehicle
             {
@@ -66,6 +82,25 @@ namespace BoxService_BackEnd.Services
             };
 
             return _repository.Create(vehicle);
+        }
+
+        // El auto se vendió / cambió de dueño: re-apunta id_cliente sin
+        // tocar el vehículo en sí, así que el historial de services,
+        // presupuestos y facturas (que cuelgan de vehicleId) se conserva
+        // y pasa a verse bajo el nuevo dueño.
+        public Vehicle Transfer(int tenantId, int vehicleId, int newClientId)
+        {
+            var vehicle = _repository.GetById(vehicleId, tenantId)
+                ?? throw new KeyNotFoundException("Vehicle not found.");
+
+            if (new ClientRepository().GetById(newClientId, tenantId) is null)
+                throw new ArgumentException("Cliente no encontrado en este taller.");
+
+            if (vehicle.ClientId == newClientId)
+                throw new InvalidOperationException("El vehículo ya pertenece a ese cliente.");
+
+            _repository.UpdateOwner(vehicleId, tenantId, newClientId);
+            return _repository.GetById(vehicleId, tenantId)!;
         }
     }
 }

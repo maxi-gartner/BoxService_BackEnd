@@ -33,4 +33,9 @@ namespace BoxService_BackEnd.Models
         // Permite recibir el kilometraje actual cuando se crea un vehículo.
         public int CurrentMileage { get; set; }
     }
+
+    public class VehicleTransferRequest
+    {
+        public int NewClientId { get; set; }
+    }
 }

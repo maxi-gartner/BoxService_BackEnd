@@ -143,16 +143,52 @@ namespace BoxService_BackEnd.Repositories
         }
 
         // Sin filtro de tenant a propósito: la patente es única en toda la
-        // tabla (constraint de la base, viene de antes del multi-tenant),
-        // se usa solo para chequear unicidad antes de un INSERT — no para
-        // exponer datos de otro tenant (ver VehicleService.Create).
-        public bool PlateExistsAnywhere(string plate)
+        // tabla (constraint de la base, viene de antes del multi-tenant).
+        // Se usa para chequear unicidad antes de un INSERT — el tenant_id
+        // que trae el resultado es lo que permite a VehicleService.Create
+        // decidir si expone el dueño actual (mismo taller, posible
+        // transferencia) o solo bloquea sin detalles (taller ajeno).
+        public (Vehicle Vehicle, string? ClientName)? GetByPlateAnywhere(string plate)
         {
             using var conn = DatabaseConnection.GetConnection();
-            using var cmd = new NpgsqlCommand(
-                "SELECT EXISTS (SELECT 1 FROM vehiculos WHERE UPPER(patente) = UPPER(@patente));", conn);
+
+            using var cmd = new NpgsqlCommand(@"
+                SELECT
+                    v.id_vehiculo, v.id_cliente, v.tenant_id, v.marca, v.modelo, v.version,
+                    v.anio, v.patente, v.kilometraje_actual, v.created_at,
+                    c.nombre AS client_nombre
+                FROM vehiculos v
+                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente AND c.tenant_id = v.tenant_id
+                WHERE UPPER(v.patente) = UPPER(@patente);", conn);
+
             cmd.Parameters.AddWithValue("patente", plate);
-            return (bool)cmd.ExecuteScalar()!;
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+
+            var clientName = reader.IsDBNull(reader.GetOrdinal("client_nombre"))
+                ? null
+                : reader.GetString(reader.GetOrdinal("client_nombre"));
+            return (MapRow(reader), clientName);
+        }
+
+        // Transferencia de dueño: solo pisa id_cliente. El resto de la
+        // historia del auto (services, presupuestos, facturas) cuelga de
+        // id_vehiculo, no de id_cliente, así que queda intacta y pasa a
+        // verse bajo el nuevo dueño automáticamente.
+        public bool UpdateOwner(int vehicleId, int tenantId, int newClientId)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                UPDATE vehiculos
+                SET id_cliente = @new_client_id
+                WHERE id_vehiculo = @id AND tenant_id = @tenant_id;", conn);
+
+            cmd.Parameters.AddWithValue("new_client_id", newClientId);
+            cmd.Parameters.AddWithValue("id", vehicleId);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+
+            return cmd.ExecuteNonQuery() > 0;
         }
 
         public List<Vehicle> GetByClientId(int clientId, int tenantId)

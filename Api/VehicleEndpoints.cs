@@ -61,6 +61,23 @@ public static class VehicleEndpoints
             {
                 return Error(400, ex.Message);
             }
+            catch (VehiclePlateConflictException ex)
+            {
+                // 409 con payload extra (no solo mensaje) para que el
+                // frontend pueda ofrecer "Transferir vehículo" en vez de
+                // mostrar un error genérico — ver VehicleStep (web).
+                return Results.Json(new ApiEnvelope<object>
+                {
+                    Success = false,
+                    Data = new
+                    {
+                        existingVehicleId = ex.ExistingVehicleId,
+                        existingClientId = ex.ExistingClientId,
+                        existingClientName = ex.ExistingClientName
+                    },
+                    Error = new ApiError(409, ex.Message)
+                }, statusCode: 409);
+            }
             catch (InvalidOperationException ex)
             {
                 return Error(400, ex.Message);
@@ -72,6 +89,27 @@ public static class VehicleEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
             {
                 return Error(400, "A vehicle with that plate already exists.");
+            }
+        });
+
+        app.MapPost("/vehicles/{id:int}/transfer", (int id, VehicleTransferRequest request, HttpContext context, VehicleService service) =>
+        {
+            try
+            {
+                var vehicle = service.Transfer(context.TenantId(), id, request.NewClientId);
+                return Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
+            }
+            catch (ArgumentException ex)
+            {
+                return Error(400, ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Error(400, ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Error(404, ex.Message);
             }
         });
     }
