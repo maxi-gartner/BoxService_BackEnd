@@ -8,7 +8,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class BudgetRepository
     {
-        public List<Budget> GetAll(int tenantId)
+        public virtual List<Budget> GetAll(int tenantId)
         {
             var lista = new List<Budget>();
 
@@ -35,7 +35,7 @@ namespace BoxService_BackEnd.Repositories
         // Trae marca/modelo/patente del vehículo embebidos (join) para que
         // la página de Presupuestos no tenga que pedir /vehicles aparte
         // solo para mostrar la etiqueta de cada fila.
-        public (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+        public virtual (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
             int tenantId, int page, int pageSize, string? status)
         {
             var result = new List<(Budget, string, string, string)>();
@@ -72,7 +72,7 @@ namespace BoxService_BackEnd.Repositories
             return (result, totalCount);
         }
 
-        public Budget? GetById(int id, int tenantId)
+        public virtual Budget? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -92,7 +92,7 @@ namespace BoxService_BackEnd.Repositories
         // Usado por el portal del cliente para mostrar el último
         // presupuesto de un vehículo puntual — el resto de la API no
         // necesitaba filtrar presupuestos por vehículo hasta ahora.
-        public List<Budget> GetByVehicleId(int vehicleId, int tenantId)
+        public virtual List<Budget> GetByVehicleId(int vehicleId, int tenantId)
         {
             var lista = new List<Budget>();
 
@@ -116,7 +116,7 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        public List<BudgetDetail> GetDetails(int budgetId)
+        public virtual List<BudgetDetail> GetDetails(int budgetId)
         {
             var lista = new List<BudgetDetail>();
 
@@ -152,7 +152,7 @@ namespace BoxService_BackEnd.Repositories
         // SEQUENCE de Postgres. nextval() nunca devuelve el mismo valor dos veces,
         // incluso si dos requests concurrentes lo llaman al mismo tiempo — a
         // diferencia de leer el último número y sumarle 1 en memoria.
-        public long GetNextNumber()
+        public virtual long GetNextNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -164,7 +164,7 @@ namespace BoxService_BackEnd.Repositories
             return (long)cmd.ExecuteScalar()!;
         }
 
-        public int CreateWithDetails(Budget budget, List<BudgetDetail> details)
+        public virtual int CreateWithDetails(Budget budget, List<BudgetDetail> details)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var tx = conn.BeginTransaction();
@@ -243,7 +243,7 @@ namespace BoxService_BackEnd.Repositories
         // insertar) — más simple que diffear altas/bajas/modificaciones
         // ítem por ítem, y el caller (BudgetService.UpdateDetails) ya
         // valida que el presupuesto no esté finalizado antes de llamarlo.
-        public void ReplaceDetails(int budgetId, List<BudgetDetail> details)
+        public virtual void ReplaceDetails(int budgetId, List<BudgetDetail> details)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var tx = conn.BeginTransaction();
@@ -264,7 +264,7 @@ namespace BoxService_BackEnd.Repositories
             tx.Commit();
         }
 
-        public bool UpdateStatus(int id, int tenantId, string status)
+        public virtual bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -341,7 +341,7 @@ namespace BoxService_BackEnd.Repositories
         /// Esta es la relación correcta según el modelo nuevo:
         /// presupuestos.id_service -> services.id_service
         /// </summary>
-        public void AssignService(int budgetId, int tenantId, int serviceId)
+        public virtual void AssignService(int budgetId, int tenantId, int serviceId)
         {
             using var conn = DatabaseConnection.GetConnection();
 

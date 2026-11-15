@@ -5,8 +5,18 @@ namespace BoxService_BackEnd.Services;
 
 public class BudgetService
 {
-    private readonly BudgetRepository _repo = new();
-    private readonly ServicesRepository _services = new();
+    private readonly BudgetRepository _repo;
+    private readonly ServicesRepository _services;
+    private readonly VehicleRepository _vehicles;
+
+    public BudgetService() : this(new BudgetRepository(), new ServicesRepository(), new VehicleRepository()) { }
+
+    public BudgetService(BudgetRepository repo, ServicesRepository services, VehicleRepository vehicles)
+    {
+        _repo = repo;
+        _services = services;
+        _vehicles = vehicles;
+    }
 
     public List<Budget> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
@@ -30,7 +40,7 @@ public class BudgetService
         if (req.VehicleId <= 0) return (false, false, "vehicleId is required", null);
         var error = BudgetDetailRules.Validate(req.Details);
         if (error is not null) return (false, false, error, null);
-        if (new VehicleRepository().GetById(req.VehicleId, tenantId) is null)
+        if (_vehicles.GetById(req.VehicleId, tenantId) is null)
             return (false, true, "Vehículo no encontrado en este taller.", null);
         var budget = new Budget
         {

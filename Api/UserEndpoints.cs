@@ -26,7 +26,7 @@ public static class UserEndpoints
         {
             var user = service.CreateEmployee(context.TenantId(), request);
             return Ok(UserDto.FromModel(user), 201);
-        }));
+        })).RequireAuthorization(policy => policy.RequireRole("dueno"));
 
         app.MapPatch("/users/{id:int}", (int id, UserUpdateRequest request, HttpContext context, UserService service) => Write(() =>
         {

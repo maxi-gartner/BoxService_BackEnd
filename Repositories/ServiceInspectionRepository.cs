@@ -4,7 +4,7 @@ using Npgsql;
 
 namespace BoxService_BackEnd.Repositories;
 
-public sealed class ServiceInspectionRepository
+public class ServiceInspectionRepository
 {
     private readonly PostgresConnectionFactory _connectionFactory;
 
@@ -15,7 +15,7 @@ public sealed class ServiceInspectionRepository
         _connectionFactory = connectionFactory;
     }
 
-    public async Task<bool> ServiceExistsAsync(
+    public virtual async Task<bool> ServiceExistsAsync(
         int serviceId,
         CancellationToken cancellationToken
     )
@@ -41,7 +41,7 @@ public sealed class ServiceInspectionRepository
         );
     }
 
-    public async Task<ServiceInspection?> GetByServiceIdAsync(
+    public virtual async Task<ServiceInspection?> GetByServiceIdAsync(
         int serviceId,
         CancellationToken cancellationToken
     )
@@ -75,7 +75,7 @@ public sealed class ServiceInspectionRepository
         return inspection;
     }
 
-    public async Task<ServiceInspection> CreateAsync(
+    public virtual async Task<ServiceInspection> CreateAsync(
         ServiceInspection inspection,
         CancellationToken cancellationToken
     )
@@ -148,7 +148,7 @@ public sealed class ServiceInspectionRepository
         return inspection;
     }
 
-    public async Task<ServiceInspection?> UpdateAsync(
+    public virtual async Task<ServiceInspection?> UpdateAsync(
         ServiceInspection inspection,
         CancellationToken cancellationToken
     )
@@ -236,7 +236,7 @@ public sealed class ServiceInspectionRepository
         return inspection;
     }
 
-    public async Task<int> CountPhotosAsync(
+    public virtual async Task<int> CountPhotosAsync(
         int inspectionId,
         CancellationToken cancellationToken
     )
@@ -263,7 +263,7 @@ public sealed class ServiceInspectionRepository
         );
     }
 
-    public async Task<ServiceInspectionPhoto> CreatePhotoAsync(
+    public virtual async Task<ServiceInspectionPhoto> CreatePhotoAsync(
         ServiceInspectionPhoto photo,
         CancellationToken cancellationToken
     )
@@ -337,7 +337,7 @@ public sealed class ServiceInspectionRepository
         return photo;
     }
 
-    public async Task<ServiceInspectionPhoto?> GetPhotoAsync(
+    public virtual async Task<ServiceInspectionPhoto?> GetPhotoAsync(
         int serviceId,
         int photoId,
         CancellationToken cancellationToken
@@ -424,7 +424,7 @@ public sealed class ServiceInspectionRepository
         };
     }
 
-    public async Task<bool> DeletePhotoAsync(
+    public virtual async Task<bool> DeletePhotoAsync(
         int photoId,
         CancellationToken cancellationToken
     )

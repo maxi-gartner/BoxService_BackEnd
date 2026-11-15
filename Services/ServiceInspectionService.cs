@@ -2,10 +2,11 @@ using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Models;
 using BoxService_BackEnd.Repositories;
 using BoxService_BackEnd.Storage;
+using BoxService_BackEnd.Services.Abstractions;
 
 namespace BoxService_BackEnd.Services;
 
-public sealed class ServiceInspectionService
+public sealed class ServiceInspectionService : IInspectionPhotoService
 {
     private readonly ServiceInspectionRepository _repository;
     private readonly SupabaseStorageService _storage;

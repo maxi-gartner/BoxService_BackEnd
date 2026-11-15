@@ -30,7 +30,7 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
-        public Sucursal? GetById(int id, int tenantId)
+        public virtual Sucursal? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"

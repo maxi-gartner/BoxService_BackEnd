@@ -9,7 +9,18 @@ namespace BoxService_BackEnd.Services
     {
         // Repository = capa que habla con la base de datos.
         // El Service no hace SQL directo, le pide al Repository que guarde o consulte.
-        private readonly ServicesRepository _repository = new();
+        private readonly ServicesRepository _repository;
+        private readonly VehicleRepository _vehicles;
+        private readonly SucursalRepository _sucursales;
+
+        public ServicesService() : this(new ServicesRepository(), new VehicleRepository(), new SucursalRepository()) { }
+
+        public ServicesService(ServicesRepository repository, VehicleRepository vehicles, SucursalRepository sucursales)
+        {
+            _repository = repository;
+            _vehicles = vehicles;
+            _sucursales = sucursales;
+        }
 
         // GET /api/services
         // Trae todos los services del tenant desde la base de datos.
@@ -56,10 +67,10 @@ namespace BoxService_BackEnd.Services
 
             // 2. Validar: controlar que los datos obligatorios est�n bien.
             Validate(service);
-            if (new VehicleRepository().GetById(service.VehicleId, service.TenantId) is null)
+            if (_vehicles.GetById(service.VehicleId, service.TenantId) is null)
                 throw new ArgumentException("Vehículo no encontrado en este taller.");
             if (service.SucursalId is int branchId &&
-                new SucursalRepository().GetById(branchId, service.TenantId) is not { Active: true })
+                _sucursales.GetById(branchId, service.TenantId) is not { Active: true })
                 throw new ArgumentException("Sucursal no encontrada o inactiva en este taller.");
 
             // 3. L�gica de negocio:

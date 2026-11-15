@@ -2,7 +2,7 @@ using Supabase;
 
 namespace BoxService_BackEnd.Storage;
 
-public sealed class SupabaseStorageService
+public class SupabaseStorageService
 {
     private readonly Client? _client;
     private readonly string _bucket;
@@ -52,7 +52,7 @@ public sealed class SupabaseStorageService
         }
     }
 
-    public async Task UploadAsync(
+    public virtual async Task UploadAsync(
         Stream stream,
         string storagePath,
         string contentType,
@@ -118,7 +118,7 @@ public sealed class SupabaseStorageService
         }
     }
 
-    public async Task<string> CreateSignedUrlAsync(
+    public virtual async Task<string> CreateSignedUrlAsync(
         string storagePath,
         int expiresInSeconds = 900
     )
@@ -134,7 +134,7 @@ public sealed class SupabaseStorageService
             );
     }
 
-    public async Task DeleteAsync(
+    public virtual async Task DeleteAsync(
         string storagePath
     )
     {

@@ -1,5 +1,6 @@
 using BoxService_BackEnd.DTOs;
 using BoxService_BackEnd.Services;
+using BoxService_BackEnd.Services.Abstractions;
 using Npgsql;
 using static BoxService_BackEnd.Api.ModuleResults;
 
@@ -151,7 +152,8 @@ public static class ServiceInspectionEndpoints
             async (
                 int serviceId,
                 HttpRequest request,
-                ServiceInspectionService service,
+                IInspectionPhotoService service,
+                HttpContext context,
                 CancellationToken cancellationToken
             ) =>
             {
@@ -219,10 +221,7 @@ public static class ServiceInspectionEndpoints
                 }
                 catch (InvalidOperationException exception)
                 {
-                    return Error(
-                        503,
-                        exception.Message
-                    );
+                    return StorageUnavailable(context, exception, "upload", serviceId);
                 }
             }
         ).DisableAntiforgery();
@@ -232,7 +231,8 @@ public static class ServiceInspectionEndpoints
             async (
                 int serviceId,
                 int photoId,
-                ServiceInspectionService service,
+                IInspectionPhotoService service,
+                HttpContext context,
                 CancellationToken cancellationToken
             ) =>
             {
@@ -260,10 +260,7 @@ public static class ServiceInspectionEndpoints
                 }
                 catch (InvalidOperationException exception)
                 {
-                    return Error(
-                        503,
-                        exception.Message
-                    );
+                    return StorageUnavailable(context, exception, "signed-url", serviceId, photoId);
                 }
             }
         );
@@ -273,7 +270,8 @@ public static class ServiceInspectionEndpoints
             async (
                 int serviceId,
                 int photoId,
-                ServiceInspectionService service,
+                IInspectionPhotoService service,
+                HttpContext context,
                 CancellationToken cancellationToken
             ) =>
             {
@@ -300,12 +298,22 @@ public static class ServiceInspectionEndpoints
                 }
                 catch (InvalidOperationException exception)
                 {
-                    return Error(
-                        503,
-                        exception.Message
-                    );
+                    return StorageUnavailable(context, exception, "delete", serviceId, photoId);
                 }
             }
         );
+    }
+
+    private static IResult StorageUnavailable(HttpContext context, InvalidOperationException exception,
+        string operation, int serviceId, int? photoId = null)
+    {
+        // Allowlist diagnostics: provider exception messages/inner exceptions can
+        // contain credentials, signed URLs or configuration. Never log them raw.
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger(typeof(ServiceInspectionEndpoints).FullName!);
+        logger.LogError(new EventId(50301, "InspectionPhotoStorageUnavailable"),
+            "Photo storage unavailable. Operation={Operation} ServiceId={ServiceId} PhotoId={PhotoId} ExceptionType={ExceptionType} TraceId={TraceId}",
+            operation, serviceId, photoId, exception.GetType().FullName, context.TraceIdentifier);
+        return Error(503, "El almacenamiento de fotografías no está disponible. Intentá nuevamente más tarde.");
     }
 }

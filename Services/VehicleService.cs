@@ -8,10 +8,14 @@ namespace BoxService_BackEnd.Services
     public class VehicleService
     {
         private readonly VehicleRepository _repository;
+        private readonly ClientRepository _clients;
 
-        public VehicleService(VehicleRepository repository)
+        public VehicleService(VehicleRepository repository) : this(repository, new ClientRepository()) { }
+
+        public VehicleService(VehicleRepository repository, ClientRepository clients)
         {
             _repository = repository;
+            _clients = clients;
         }
 
         public List<Vehicle> List(int tenantId) => _repository.GetAll(tenantId);
@@ -42,7 +46,7 @@ namespace BoxService_BackEnd.Services
             if (request.CurrentMileage < 0)
                 throw new ArgumentException("Current mileage cannot be negative.");
 
-            if (new ClientRepository().GetById(request.ClientId, tenantId) is null)
+            if (_clients.GetById(request.ClientId, tenantId) is null)
                 throw new ArgumentException("Cliente no encontrado en este taller.");
 
             var plate = request.Plate.Trim().ToUpperInvariant();
@@ -93,7 +97,7 @@ namespace BoxService_BackEnd.Services
             var vehicle = _repository.GetById(vehicleId, tenantId)
                 ?? throw new KeyNotFoundException("Vehicle not found.");
 
-            if (new ClientRepository().GetById(newClientId, tenantId) is null)
+            if (_clients.GetById(newClientId, tenantId) is null)
                 throw new ArgumentException("Cliente no encontrado en este taller.");
 
             if (vehicle.ClientId == newClientId)

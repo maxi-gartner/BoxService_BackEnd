@@ -9,7 +9,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class ClientRepository : IClientRepository
     {
-        public List<Client> GetAll(int tenantId)
+        public virtual List<Client> GetAll(int tenantId)
         {
             var result = new List<Client>();
 
@@ -32,7 +32,7 @@ namespace BoxService_BackEnd.Repositories
         }
 
         // search: ILIKE sobre nombre/teléfono/email, OR entre los tres.
-        public (List<Client> Items, int TotalCount) GetPaged(int tenantId, int page, int pageSize, string? search)
+        public virtual (List<Client> Items, int TotalCount) GetPaged(int tenantId, int page, int pageSize, string? search)
         {
             var result = new List<Client>();
             var totalCount = 0;
@@ -65,7 +65,7 @@ namespace BoxService_BackEnd.Repositories
             return (result, totalCount);
         }
 
-        public Client? GetById(int id, int tenantId)
+        public virtual Client? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
@@ -83,7 +83,7 @@ namespace BoxService_BackEnd.Repositories
         // Sin tenant: la usa el portal del cliente (rol "customer", JWT
         // sin tenantId) — ahí la autorización pasa por la cadena
         // google_sub → client_portal_access, no por pertenencia a tenant.
-        public Client? GetById(int id)
+        public virtual Client? GetById(int id)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
@@ -99,7 +99,7 @@ namespace BoxService_BackEnd.Repositories
 
         // Para el panel cross-tenant de superadmin — sin filtro, con el
         // nombre del tenant embebido.
-        public List<(Client Client, string TenantName)> GetAllAdmin()
+        public virtual List<(Client Client, string TenantName)> GetAllAdmin()
         {
             var result = new List<(Client, string)>();
 
@@ -121,7 +121,7 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
-        public Client Create(int tenantId, ClientCreateRequest request)
+        public virtual Client Create(int tenantId, ClientCreateRequest request)
         {
             var name = (request.Nombre ?? request.Name)!.Trim();
             var phone = (request.Telefono ?? request.Phone ?? "").Trim();
@@ -144,7 +144,7 @@ namespace BoxService_BackEnd.Repositories
             return MapClient(reader);
         }
 
-        public List<ClientVehicle> GetVehiclesByClientId(int clientId, int tenantId)
+        public virtual List<ClientVehicle> GetVehiclesByClientId(int clientId, int tenantId)
         {
             var result = new List<ClientVehicle>();
 

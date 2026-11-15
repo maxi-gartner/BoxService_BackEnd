@@ -8,7 +8,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class ServicesRepository
     {
-        public List<Service> GetAll(int tenantId)
+        public virtual List<Service> GetAll(int tenantId)
         {
             var services = new List<Service>();
 
@@ -33,7 +33,7 @@ namespace BoxService_BackEnd.Repositories
             return services;
         }
 
-        public Service? GetById(int id)
+        public virtual Service? GetById(int id)
         {
             using var connection = DatabaseConnection.GetConnection();
 
@@ -55,7 +55,7 @@ namespace BoxService_BackEnd.Repositories
         // no dejar ver/tocar un service de otro tenant adivinando el ID.
         // GetById (sin tenant) queda para los usos internos que ya validan
         // pertenencia por otro lado (ver BudgetService.AssignService).
-        public Service? GetByIdScoped(int id, int tenantId)
+        public virtual Service? GetByIdScoped(int id, int tenantId)
         {
             using var connection = DatabaseConnection.GetConnection();
 
@@ -74,7 +74,7 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapService(reader) : null;
         }
 
-        public List<Service> GetByVehicleId(int vehicleId, int tenantId)
+        public virtual List<Service> GetByVehicleId(int vehicleId, int tenantId)
         {
             var services = new List<Service>();
 
@@ -101,7 +101,7 @@ namespace BoxService_BackEnd.Repositories
             return services;
         }
 
-        public Service Create(Service service)
+        public virtual Service Create(Service service)
         {
             using var connection = DatabaseConnection.GetConnection();
             using var transaction = connection.BeginTransaction();
@@ -158,7 +158,7 @@ namespace BoxService_BackEnd.Repositories
             return service;
         }
 
-        public List<ServiceDetail> GetDetailsByServiceId(int serviceId)
+        public virtual List<ServiceDetail> GetDetailsByServiceId(int serviceId)
         {
             var detalles = new List<ServiceDetail>();
 
@@ -189,7 +189,7 @@ namespace BoxService_BackEnd.Repositories
             return detalles;
         }
 
-        public ServiceDetail CreateDetail(ServiceDetail detail)
+        public virtual ServiceDetail CreateDetail(ServiceDetail detail)
         {
             using var connection = DatabaseConnection.GetConnection();
 

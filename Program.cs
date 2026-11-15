@@ -133,12 +133,40 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true,
             }));
+    options.AddPolicy("portal-login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
 });
 
-// Cors:AllowedOrigin (env var Cors__AllowedOrigin) restringe el origen una
-// vez que hay un frontend público real que proteger (Vercel). Sin setear,
-// sigue permitiendo cualquier origen — no rompe nada en desarrollo local.
+// Render: Cors__AllowedOrigin debe ser el origen real del frontend.
+// El comando de setup no inicia HTTP y no necesita configuración CORS.
 var allowedOrigin = builder.Configuration["Cors:AllowedOrigin"];
+if (builder.Environment.IsProduction() && !args.Contains("--setup-db", StringComparer.OrdinalIgnoreCase))
+{
+    if (string.IsNullOrWhiteSpace(allowedOrigin)
+        || allowedOrigin.Contains('*')
+        || allowedOrigin.Any(char.IsWhiteSpace)
+        || !Uri.TryCreate(allowedOrigin, UriKind.Absolute, out var origin)
+        || !origin.IsWellFormedOriginalString()
+        || origin.Scheme is not ("http" or "https")
+        || string.IsNullOrEmpty(origin.Host)
+        || !string.IsNullOrEmpty(origin.UserInfo)
+        || origin.AbsolutePath != "/"
+        || !string.IsNullOrEmpty(origin.Query)
+        || !string.IsNullOrEmpty(origin.Fragment))
+    {
+        throw new InvalidOperationException(
+            "Cors:AllowedOrigin debe indicar un único origen HTTP(S) explícito en Production, sin comodines, credenciales, ruta, query ni fragmento.");
+    }
+    allowedOrigin = origin.GetLeftPart(UriPartial.Authority);
+}
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -168,8 +196,11 @@ builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<BudgetRepository>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddScoped<InvoiceRepository>();
+builder.Services.AddScoped<ServicesRepository>();
 builder.Services.AddScoped<ServiceInspectionRepository>();
 builder.Services.AddScoped<ServiceInspectionService>();
+builder.Services.AddScoped<IInspectionPhotoService>(sp => sp.GetRequiredService<ServiceInspectionService>());
 builder.Services.AddSingleton<SupabaseStorageService>();
 builder.Services.AddScoped<ServicesService>();
 builder.Services.AddScoped<ITenantServiceAccess, TenantServiceAccess>();
@@ -220,6 +251,22 @@ if (args.Contains("--setup-db", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+// OnStarting conserva estas cabeceras incluso si el manejador global limpia
+// la respuesta. Sólo raíz y health son respuestas públicas no sensibles.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
+    var publicRead = (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+        && (path == "" || path.Equals("/health", StringComparison.OrdinalIgnoreCase));
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        if (!publicRead) context.Response.Headers.CacheControl = "no-store";
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -234,9 +281,9 @@ app.UseExceptionHandler(errorApp =>
 app.UseRouting();
 app.UseCors();
 app.UseRateLimiter();
-app.UseAuthentication();
-app.UseAuthorization();
 
+// Envolver autenticación/autorización para completar sus respuestas sin cuerpo,
+// conservando el código HTTP y las cabeceras del challenge JWT.
 app.UseStatusCodePages(async statusContext =>
 {
     var response = statusContext.HttpContext.Response;
@@ -244,6 +291,10 @@ app.UseStatusCodePages(async statusContext =>
         response.StatusCode,
         response.StatusCode == 404 ? "Route not found." : "Invalid request."));
 });
+
+app.UseAuthentication();
+app.UseMiddleware<ApiMutationAuditMiddleware>();
+app.UseAuthorization();
 
 app.Use(async (context, next) =>
 {
@@ -301,7 +352,8 @@ app.Use(async (context, next) =>
     // ni /admin, eso es solo de superadmin.
     var isAdminRoute = path.StartsWith("/tenants", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase);
-    var isUsersRoute = path == "/users" || path.StartsWith("/users/", StringComparison.OrdinalIgnoreCase);
+    var isUsersRoute = path.Equals("/users", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/users/", StringComparison.OrdinalIgnoreCase);
     var isSuperadminAllowed = isPublicRoute || isAdminRoute || isUsersRoute || path == "/auth/me";
 
     if (!isPublicRoute && role == "superadmin" && !isSuperadminAllowed)
@@ -332,8 +384,6 @@ app.Use(async (context, next) =>
 
     await next();
 });
-
-app.UseMiddleware<ApiMutationAuditMiddleware>();
 
 app.MapGet("/", () => ApiEnvelope<object>.Ok(new
 {

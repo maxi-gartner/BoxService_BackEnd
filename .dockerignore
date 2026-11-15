@@ -10,3 +10,28 @@ obj/
 appsettings.json
 appsettings.Development.json
 appsettings.Local.json
+
+# Secretos, claves y certificados, también en subdirectorios.
+**/.env
+**/.env.*
+**/secrets.json
+**/*.key
+**/*.pem
+**/*.pfx
+
+# Resultados de pruebas y cobertura.
+**/TestResults/
+**/*.trx
+**/coverage/
+**/coverage.*
+**/*.coverage
+**/*.coveragexml
+**/lcov.info
+
+# Logs y archivos temporales.
+**/logs/
+**/*.log
+**/tmp/
+**/temp/
+**/*.tmp
+**/*.temp

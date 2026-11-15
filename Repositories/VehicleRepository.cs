@@ -8,7 +8,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class VehicleRepository
     {
-        public List<Vehicle> GetAll(int tenantId)
+        public virtual List<Vehicle> GetAll(int tenantId)
         {
             var result = new List<Vehicle>();
 
@@ -45,7 +45,7 @@ namespace BoxService_BackEnd.Repositories
         // search: ILIKE sobre patente/marca/modelo/nombre del cliente (join
         // contra clientes) — mismo criterio que usaba VehicleSearch a mano
         // en el frontend, ahora resuelto server-side.
-        public (List<(Vehicle Vehicle, string? ClientName)> Items, int TotalCount) GetPaged(
+        public virtual (List<(Vehicle Vehicle, string? ClientName)> Items, int TotalCount) GetPaged(
             int tenantId, int page, int pageSize, string? search)
         {
             var result = new List<(Vehicle, string?)>();
@@ -88,7 +88,7 @@ namespace BoxService_BackEnd.Repositories
             return (result, totalCount);
         }
 
-        public Vehicle? GetById(int id, int tenantId)
+        public virtual Vehicle? GetById(int id, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -115,7 +115,7 @@ namespace BoxService_BackEnd.Repositories
             return reader.Read() ? MapRow(reader) : null;
         }
 
-        public Vehicle? GetByPlate(string plate, int tenantId)
+        public virtual Vehicle? GetByPlate(string plate, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -148,7 +148,7 @@ namespace BoxService_BackEnd.Repositories
         // que trae el resultado es lo que permite a VehicleService.Create
         // decidir si expone el dueño actual (mismo taller, posible
         // transferencia) o solo bloquea sin detalles (taller ajeno).
-        public (Vehicle Vehicle, string? ClientName)? GetByPlateAnywhere(string plate)
+        public virtual (Vehicle Vehicle, string? ClientName)? GetByPlateAnywhere(string plate)
         {
             using var conn = DatabaseConnection.GetConnection();
 
@@ -176,7 +176,7 @@ namespace BoxService_BackEnd.Repositories
         // historia del auto (services, presupuestos, facturas) cuelga de
         // id_vehiculo, no de id_cliente, así que queda intacta y pasa a
         // verse bajo el nuevo dueño automáticamente.
-        public bool UpdateOwner(int vehicleId, int tenantId, int newClientId)
+        public virtual bool UpdateOwner(int vehicleId, int tenantId, int newClientId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
@@ -191,7 +191,7 @@ namespace BoxService_BackEnd.Repositories
             return cmd.ExecuteNonQuery() > 0;
         }
 
-        public List<Vehicle> GetByClientId(int clientId, int tenantId)
+        public virtual List<Vehicle> GetByClientId(int clientId, int tenantId)
         {
             var result = new List<Vehicle>();
 
@@ -228,7 +228,7 @@ namespace BoxService_BackEnd.Repositories
 
         // Sin tenant: la usa el portal del cliente, mismo criterio que
         // ClientRepository.GetById(id) sin tenant.
-        public List<Vehicle> GetByClientId(int clientId)
+        public virtual List<Vehicle> GetByClientId(int clientId)
         {
             var result = new List<Vehicle>();
 
@@ -262,7 +262,7 @@ namespace BoxService_BackEnd.Repositories
             return result;
         }
 
-        public Vehicle Create(Vehicle vehicle)
+        public virtual Vehicle Create(Vehicle vehicle)
         {
             using var conn = DatabaseConnection.GetConnection();
 

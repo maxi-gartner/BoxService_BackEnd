@@ -3,9 +3,9 @@ using Npgsql;
 
 namespace BoxService_BackEnd.Repositories;
 
-public sealed class AuthAuditRepository
+public class AuthAuditRepository
 {
-    public void Record(
+    public virtual void Record(
         string eventType,
         string outcome,
         int? actorUserId,

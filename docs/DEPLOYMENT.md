@@ -126,6 +126,108 @@ también requiere aplicar `019_ampliar_auditoria_api.sql`.
 
 ## CORS
 
-`Cors:AllowedOrigin` reemplaza el `AllowAnyOrigin()` que había antes. Sin
-setear (por ejemplo, en dev local sin esa env var) sigue permitiendo
-cualquier origen — no rompe nada corriendo en `localhost`.
+En `Production`, `Cors:AllowedOrigin` es obligatorio. En Render se configura como
+`Cors__AllowedOrigin`, usando **el origen real del frontend de ese ambiente**:
+esquema, host y puerto si corresponde. No copiar un dominio de ejemplo ni usar
+la URL del backend. La variable ya está declarada como `sync: false` en
+`render.yaml`; su valor debe verificarse en el dashboard de cada servicio.
+
+Se rechazan valores vacíos, comodines (`*`, subdominios wildcard), listas de
+orígenes, credenciales, rutas, query strings, fragmentos y esquemas distintos de
+HTTP/HTTPS. Se acepta una barra final de raíz y se normaliza al origen sin barra.
+Una configuración inválida impide iniciar el servidor HTTP con un error que
+identifica la clave, sin imprimir su valor. Para el frontend público de Render/
+Vercel se debe utilizar su origen HTTPS real. No se habilitan cookies cross-origin.
+
+En `Development` se conserva el comportamiento anterior: sin origen configurado
+se permite cualquier origen; si se configura uno, se utiliza ese origen. Para
+trabajar localmente con el ejemplo de configuración (cuyo origen queda vacío):
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+dotnet run
+```
+
+Comprobar también `DOTNET_ENVIRONMENT` si está definido. El nombre del servicio
+Render (por ejemplo, que termine en `-dev`) no determina el ambiente de ASP.NET
+Core. Sin configuración explícita, el ambiente predeterminado es `Production`.
+No cambiar un despliegue público a `Development` para evitar esta validación.
+Los comandos de mantenimiento `migrate`, `hash-password` y `--setup-db` no
+necesitan CORS porque no sirven solicitudes HTTP.
+
+Conservar la correspondencia exacta con el `Origin` enviado por el navegador.
+Una solicitud server-to-server del proxy de Next.js puede no llevar `Origin`:
+CORS no reemplaza la autenticación y no bloquea por sí mismo esos clientes.
+
+## HTTPS y proxies en Render
+
+Render documenta que termina TLS en su balanceador, redirige HTTP público a HTTPS
+y reenvía HTTP al proceso. Por eso Kestrel mantiene su listener HTTP y no se agrega
+una redirección HTTPS que pueda interferir con ese esquema o el health check.
+Ver [Web Services de Render](https://render.com/docs/web-services#connect-to-your-web-service).
+
+Pendiente de comprobar en el despliegue real:
+
+- Certificado y redirección del dominio público utilizado por el frontend.
+- Ambiente efectivo y valor real de `Cors__AllowedOrigin` en cada servicio.
+- IP que recibe Kestrel y cadena navegador → posible proxy Next.js/Vercel → Render.
+- Proxies/redes confiables, cantidad de saltos y tratamiento de X-Forwarded-For/
+  X-Forwarded-Proto por cada intermediario.
+
+No se habilita `UseForwardedHeaders` sin esa información. No limpiar las listas
+de confianza ni activar variables de forwarding indiscriminado para resolverlo.
+Una futura configuración deberá aceptar sólo intermediarios confiables y operar
+antes del rate limiter. Ver [configuración oficial de ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-10.0).
+
+## Límites de solicitudes y cabeceras
+
+| Política | Endpoints | Cupo por IP de conexión |
+|---|---|---|
+| login | POST /auth/login | 10 cada 5 minutos |
+| portal-login | POST /portal/auth/google | 10 cada 5 minutos, independiente del personal |
+| password-recovery | POST /auth/forgot-password y /auth/reset-password | 5 cada 15 minutos, compartido entre ambos |
+
+Las políticas usan ventanas fijas, sin cola, y responden 429 con el envelope JSON
+existente. Los contadores viven en memoria por instancia y se reinician con el
+proceso; no constituyen una cuota distribuida ni una protección completa contra
+abuso. Usuarios con la misma IP/NAT comparten cupo. Sin forwarding confiable,
+pueden compartir la IP del proxy; con IP ausente se comparte la partición `unknown`.
+El encabezado X-Forwarded-For enviado por el cliente no se usa directamente.
+
+Todas las respuestas reciben `X-Content-Type-Options: nosniff`. Las rutas sensibles
+reciben `Cache-Control: no-store`, incluidos errores de autenticación, autorización,
+validación, límite de solicitudes y servidor. Abarca autenticación, tokens,
+invitaciones, datos de talleres/clientes y URLs firmadas. Sólo las lecturas de `/`
+y `/health` quedan fuera de esa directiva; no se les agrega un permiso de caché.
+Se cubren también rutas desconocidas de forma conservadora. No se cambian códigos
+HTTP, cuerpos JSON, ni cabeceras de challenge JWT.
+
+`no-store` controla cachés HTTP compatibles; no borra datos previamente almacenados,
+no gobierna cachés programadas por el frontend y no modifica la respuesta del
+objeto alojado en Supabase cuando se accede directamente a una URL firmada.
+
+## Cierre de seguridad — etapa 6
+
+El middleware existente de auditoría se ejecuta después de autenticación y antes
+ de autorización y controles manuales. Registra una sola vez los rechazos 401/403
+ de endpoints reconocidos, incluidas consultas GET; conserva los eventos propios
+ de login, recuperación y logout. Las mutaciones y los rechazos son excluyentes.
+Se almacena la plantilla de ruta, nunca valores de parámetros, query strings,
+cuerpos ni credenciales. `access_denied` usa outcome `401` o `403` sin cambios de
+esquema. Una falla de persistencia no reemplaza la respuesta; el diagnóstico
+50302 incluye tipo de evento, resultado, plantilla y TraceId, sin la excepción
+ni el mensaje del proveedor. La auditoría es best effort: si no hay persistencia,
+el evento puede perderse; el log permite detectar esa situación.
+
+CI compila la solución (incluido xUnit) en Release y ejecuta `dotnet test` después
+de Build y antes de Docker, sin servicios PostgreSQL, Supabase ni Google reales.
+Un test fallido hace fallar el job. Verificar que el check sea obligatorio para
+integrar en develop/main: el workflow por sí solo no configura esa protección.
+Confirmar la primera ejecución en Ubuntu/GitHub Actions antes de cerrar el PR.
+
+Antes del despliegue siguen pendientes las verificaciones de las secciones CORS
+ y HTTPS/proxies: origen HTTPS real, ambiente Production, certificado y
+redirección pública, preflight, IP observada y cadena de proxies confiables.
+No se habilita forwarded headers automáticamente. Confirmar migraciones 018/019.
+Los límites por IP siguen siendo locales a cada instancia y pueden compartir
+cupo entre usuarios detrás de NAT o del proxy.

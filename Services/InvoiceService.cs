@@ -7,9 +7,20 @@ namespace BoxService_BackEnd.Services
 {
     public class InvoiceService
     {
-        private readonly InvoiceRepository _repo = new();
-        private readonly BudgetRepository _budgetRepo = new();
-        private readonly ServicesRepository _servicesRepo = new();
+        private readonly InvoiceRepository _repo;
+        private readonly BudgetRepository _budgetRepo;
+        private readonly ServicesRepository _servicesRepo;
+        private readonly VehicleRepository _vehicles;
+
+        public InvoiceService() : this(new InvoiceRepository(), new BudgetRepository(), new ServicesRepository(), new VehicleRepository()) { }
+
+        public InvoiceService(InvoiceRepository repo, BudgetRepository budgets, ServicesRepository services, VehicleRepository vehicles)
+        {
+            _repo = repo;
+            _budgetRepo = budgets;
+            _servicesRepo = services;
+            _vehicles = vehicles;
+        }
 
         public List<Invoice> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
@@ -35,7 +46,7 @@ namespace BoxService_BackEnd.Services
             if (_repo.InvoiceExistsForService(req.ServiceId))
                 return (false, false, "This service already has an invoice", null);
 
-            if (new VehicleRepository().GetById(service.VehicleId, tenantId) is null)
+            if (_vehicles.GetById(service.VehicleId, tenantId) is null)
                 return (false, true, "Vehículo no encontrado en este taller.", null);
 
             // Si el service ya tiene presupuesto, usarlo aunque el caller omita su ID.

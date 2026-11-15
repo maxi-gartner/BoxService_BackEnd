@@ -23,7 +23,7 @@ public static class PortalEndpoints
         {
             var outcome = await authService.AuthenticateAsync(request.IdToken, request.InviteToken);
             return outcome.Success ? Ok(outcome.Result!) : Error(401, outcome.Error!);
-        });
+        }).RequireRateLimiting("portal-login");
 
         // Rol customer: todo lo que el cliente puede ver de sus propios autos.
         app.MapGet("/portal/me", (

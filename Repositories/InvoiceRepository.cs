@@ -8,7 +8,7 @@ namespace BoxService_BackEnd.Repositories
 {
     public class InvoiceRepository
     {
-        public List<Invoice> GetAll(int tenantId)
+        public virtual List<Invoice> GetAll(int tenantId)
         {
             var lista = new List<Invoice>();
             using var conn   = DatabaseConnection.GetConnection();
@@ -23,7 +23,7 @@ namespace BoxService_BackEnd.Repositories
         // marca/modelo/patente del vehículo embebidos (join a través de
         // services) para que Facturas no tenga que pedir /services y
         // /vehicles aparte solo para armar la etiqueta de cada fila.
-        public (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
+        public virtual (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
             int tenantId, int page, int pageSize, string? status)
         {
             var result = new List<(Invoice, int, string, string, string)>();
@@ -65,7 +65,7 @@ namespace BoxService_BackEnd.Repositories
         // Sin paginar a propósito: un vehículo puntual nunca acumula miles
         // de facturas propias — la usa InvoicingList (Taller) en vez de
         // pedir la tabla global y filtrar del lado del cliente.
-        public List<Invoice> GetByVehicleId(int vehicleId, int tenantId)
+        public virtual List<Invoice> GetByVehicleId(int vehicleId, int tenantId)
         {
             var lista = new List<Invoice>();
             using var conn = DatabaseConnection.GetConnection();
@@ -84,7 +84,7 @@ namespace BoxService_BackEnd.Repositories
         // Agregados para las tarjetas de resumen de FacturasPage — un solo
         // COUNT/SUM en la base en vez de traer todas las facturas al
         // frontend solo para sumarlas ahí.
-        public (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenantId)
+        public virtual (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
@@ -102,7 +102,7 @@ namespace BoxService_BackEnd.Repositories
                 reader.GetDecimal(reader.GetOrdinal("pending_total")));
         }
 
-        public Invoice? GetById(int id, int tenantId)
+        public virtual Invoice? GetById(int id, int tenantId)
         {
             using var conn   = DatabaseConnection.GetConnection();
             using var cmd    = new NpgsqlCommand("SELECT * FROM facturas WHERE id_factura = @id AND tenant_id = @tenant_id", conn);
@@ -114,7 +114,7 @@ namespace BoxService_BackEnd.Repositories
             return invoice;
         }
 
-        public List<InvoiceDetail> GetDetails(int invoiceId, int tenantId)
+        public virtual List<InvoiceDetail> GetDetails(int invoiceId, int tenantId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
@@ -131,7 +131,7 @@ namespace BoxService_BackEnd.Repositories
             return details;
         }
 
-        public bool InvoiceExistsForService(int serviceId)
+        public virtual bool InvoiceExistsForService(int serviceId)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("SELECT COUNT(*) FROM facturas WHERE id_service = @id", conn);
@@ -141,7 +141,7 @@ namespace BoxService_BackEnd.Repositories
 
         // Ver comentario en BudgetRepository.GetNextNumber: usar una SEQUENCE evita
         // que dos facturas concurrentes terminen con el mismo número.
-        public long GetNextNumber()
+        public virtual long GetNextNumber()
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand("SELECT nextval('facturas_numero_seq')", conn);
@@ -153,7 +153,7 @@ namespace BoxService_BackEnd.Repositories
         /// 1. Inserta la factura
         /// 2. Actualiza el service
         /// </summary>
-        public int CreateWithTransaction(Invoice inv)
+        public virtual int CreateWithTransaction(Invoice inv)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var tx   = conn.BeginTransaction();
@@ -219,7 +219,7 @@ namespace BoxService_BackEnd.Repositories
             }
         }
 
-        public bool UpdateStatus(int id, int tenantId, string status)
+        public virtual bool UpdateStatus(int id, int tenantId, string status)
         {
             using var conn = DatabaseConnection.GetConnection();
             using var cmd  = new NpgsqlCommand(@"UPDATE facturas SET
