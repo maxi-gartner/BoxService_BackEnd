@@ -19,12 +19,14 @@ namespace BoxService_BackEnd.Repositories
             return lista;
         }
 
-        // status: "por-cobrar" (issued) o null/"todas" (sin filtro). Trae
+        // status: "por-cobrar" (issued) o null/"todas" (sin filtro). search:
+        // ILIKE sobre patente/marca/modelo/nombre del cliente (join contra
+        // clientes), mismo criterio que VehicleRepository.GetPaged. Trae
         // marca/modelo/patente del vehículo embebidos (join a través de
         // services) para que Facturas no tenga que pedir /services y
         // /vehicles aparte solo para armar la etiqueta de cada fila.
         public virtual (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
-            int tenantId, int page, int pageSize, string? status)
+            int tenantId, int page, int pageSize, string? status, string? search = null)
         {
             var result = new List<(Invoice, int, string, string, string)>();
             var totalCount = 0;
@@ -39,11 +41,19 @@ namespace BoxService_BackEnd.Repositories
                 FROM facturas f
                 JOIN services s ON s.id_service = f.id_service AND s.tenant_id = f.tenant_id
                 JOIN vehiculos v ON v.id_vehiculo = s.id_vehiculo AND v.tenant_id = s.tenant_id
+                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente AND c.tenant_id = v.tenant_id
                 WHERE f.tenant_id = @tenant_id {statusFilter}
+                  AND (@search::text IS NULL
+                       OR v.patente ILIKE '%' || @search::text || '%'
+                       OR v.marca ILIKE '%' || @search::text || '%'
+                       OR v.modelo ILIKE '%' || @search::text || '%'
+                       OR f.numero ILIKE '%' || @search::text || '%'
+                       OR c.nombre ILIKE '%' || @search::text || '%')
                 ORDER BY f.created_at DESC
                 LIMIT @page_size OFFSET @offset;", conn);
 
             cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim());
             cmd.Parameters.AddWithValue("page_size", pageSize);
             cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
 

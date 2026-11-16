@@ -9,7 +9,7 @@ public static class BudgetEndpoints
 {
     public static void MapBudgetEndpoints(this WebApplication app)
     {
-        app.MapGet("/budgets", (int? vehicleId, int? page, int? pageSize, string? status, HttpContext context, BudgetService service, VehicleService vehicles) =>
+        app.MapGet("/budgets", (int? vehicleId, int? page, int? pageSize, string? status, string? search, HttpContext context, BudgetService service, VehicleService vehicles) =>
         {
             var tenantId = context.TenantId();
 
@@ -21,7 +21,7 @@ public static class BudgetEndpoints
                 return Ok(service.GetByVehicleId(vid, tenantId).Select(BudgetDto.FromModel).ToArray());
             }
 
-            var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status);
+            var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status, search);
             return Ok(new PagedResult<BudgetDto>
             {
                 Items = items.Select(i => BudgetDto.FromModel(i.Budget, i.Plate, i.Brand, i.Model)).ToList(),

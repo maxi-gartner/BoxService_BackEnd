@@ -52,5 +52,21 @@ namespace BoxService_BackEnd.Services
 
             return _repository.Create(tenantId, request);
         }
+
+        public (bool ok, bool notFound, string error) Update(int id, int tenantId, ClientUpdateRequest request)
+        {
+            if (request.Name is not null && string.IsNullOrWhiteSpace(request.Name))
+                return (false, false, "Name cannot be empty.");
+
+            if (!string.IsNullOrWhiteSpace(request.Email))
+            {
+                var trimmedEmail = request.Email.Trim();
+                if (!trimmedEmail.Contains('@') || trimmedEmail.StartsWith('@') || trimmedEmail.EndsWith('@'))
+                    return (false, false, "Email is invalid.");
+            }
+
+            var updated = _repository.Update(id, tenantId, request);
+            return updated ? (true, false, "") : (false, true, "Client not found");
+        }
     }
 }

@@ -50,28 +50,7 @@ namespace BoxService_BackEnd.Services
                 throw new ArgumentException("Cliente no encontrado en este taller.");
 
             var plate = request.Plate.Trim().ToUpperInvariant();
-
-            // La patente es única en toda la tabla (constraint de la base,
-            // de antes del multi-tenant) — el chequeo de unicidad es
-            // global a propósito, no por tenant. Si el vehículo existente
-            // es de ESTE taller, devolvemos quién es el dueño actual para
-            // poder ofrecer una transferencia en vez de bloquear sin más
-            // (caso típico: el auto cambió de dueño). Si es de otro
-            // taller, seguimos bloqueando sin exponer datos ajenos.
-            var existing = _repository.GetByPlateAnywhere(plate);
-            if (existing is not null)
-            {
-                var (existingVehicle, existingClientName) = existing.Value;
-                if (existingVehicle.TenantId == tenantId)
-                {
-                    throw new VehiclePlateConflictException(
-                        existingVehicle.VehicleId,
-                        existingVehicle.ClientId,
-                        existingClientName ?? $"cliente #{existingVehicle.ClientId}");
-                }
-
-                throw new InvalidOperationException("A vehicle with that plate already exists.");
-            }
+            EnsurePlateAvailable(tenantId, plate);
 
             var vehicle = new Vehicle
             {
@@ -105,6 +84,58 @@ namespace BoxService_BackEnd.Services
 
             _repository.UpdateOwner(vehicleId, tenantId, newClientId);
             return _repository.GetById(vehicleId, tenantId)!;
+        }
+
+        public Vehicle Update(int tenantId, int vehicleId, VehicleUpdateRequest request)
+        {
+            var vehicle = _repository.GetById(vehicleId, tenantId)
+                ?? throw new KeyNotFoundException("Vehicle not found.");
+
+            var brand = string.IsNullOrWhiteSpace(request.Brand) ? vehicle.Brand : request.Brand.Trim();
+            var model = string.IsNullOrWhiteSpace(request.Model) ? vehicle.Model : request.Model.Trim();
+            var version = request.Version is null ? vehicle.Version : (string.IsNullOrWhiteSpace(request.Version) ? null : request.Version.Trim());
+            var year = request.Year ?? vehicle.Year;
+            var mileage = request.CurrentMileage ?? vehicle.CurrentMileage;
+            if (mileage < 0)
+                throw new ArgumentException("Current mileage cannot be negative.");
+
+            var plate = string.IsNullOrWhiteSpace(request.Plate) ? vehicle.Plate : request.Plate.Trim().ToUpperInvariant();
+            if (plate != vehicle.Plate)
+                EnsurePlateAvailable(tenantId, plate);
+
+            vehicle.Brand = brand;
+            vehicle.Model = model;
+            vehicle.Version = version;
+            vehicle.Year = year;
+            vehicle.Plate = plate;
+            vehicle.CurrentMileage = mileage;
+
+            _repository.Update(vehicleId, tenantId, vehicle);
+            return _repository.GetById(vehicleId, tenantId)!;
+        }
+
+        // La patente es única en toda la tabla (constraint de la base, de
+        // antes del multi-tenant) — el chequeo de unicidad es global a
+        // propósito, no por tenant. Si el vehículo existente es de ESTE
+        // taller, devolvemos quién es el dueño actual para poder ofrecer
+        // una transferencia en vez de bloquear sin más (caso típico: el
+        // auto cambió de dueño). Si es de otro taller, seguimos
+        // bloqueando sin exponer datos ajenos.
+        private void EnsurePlateAvailable(int tenantId, string plate)
+        {
+            var existing = _repository.GetByPlateAnywhere(plate);
+            if (existing is null) return;
+
+            var (existingVehicle, existingClientName) = existing.Value;
+            if (existingVehicle.TenantId == tenantId)
+            {
+                throw new VehiclePlateConflictException(
+                    existingVehicle.VehicleId,
+                    existingVehicle.ClientId,
+                    existingClientName ?? $"cliente #{existingVehicle.ClientId}");
+            }
+
+            throw new InvalidOperationException("A vehicle with that plate already exists.");
         }
     }
 }

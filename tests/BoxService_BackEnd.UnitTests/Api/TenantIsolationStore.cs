@@ -83,7 +83,7 @@ internal sealed class TenantIsolationStore
     {
         public override Budget? GetById(int id, int tenant) { s.Read("budgets", id, tenant); return s.Budgets.SingleOrDefault(x => x.BudgetId == id && x.TenantId == tenant); }
         public override List<Budget> GetAll(int tenant) { s.Read("budgets", 0, tenant); return s.Budgets.Where(x => x.TenantId == tenant).ToList(); }
-        public override (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(int tenant, int page, int size, string? status) { var rows = GetAll(tenant).Select(x => (x, "plate", "brand", "model")).ToList(); return (rows, rows.Count); }
+        public override (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(int tenant, int page, int size, string? status, string? search = null) { var rows = GetAll(tenant).Select(x => (x, "plate", "brand", "model")).ToList(); return (rows, rows.Count); }
         public override List<Budget> GetByVehicleId(int id, int tenant) { s.Read("vehicle-budgets", id, tenant); return s.Budgets.Where(x => x.VehicleId == id && x.TenantId == tenant).ToList(); }
         public override List<BudgetDetail> GetDetails(int id) { s.DetailReads++; return s.BudgetDetails.Where(x => x.BudgetId == id).ToList(); }
         public override long GetNextNumber() => 999;
@@ -108,7 +108,7 @@ internal sealed class TenantIsolationStore
     {
         public override Invoice? GetById(int id, int tenant) { s.Read("invoices", id, tenant); return s.Invoices.SingleOrDefault(x => x.InvoiceId == id && x.TenantId == tenant); }
         public override List<Invoice> GetAll(int tenant) { s.Read("invoices", 0, tenant); return s.Invoices.Where(x => x.TenantId == tenant).ToList(); }
-        public override (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(int tenant, int page, int size, string? status) { var rows = GetAll(tenant).Select(x => (x, x.ServiceId, "plate", "brand", "model")).ToList(); return (rows, rows.Count); }
+        public override (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(int tenant, int page, int size, string? status, string? search = null) { var rows = GetAll(tenant).Select(x => (x, x.ServiceId, "plate", "brand", "model")).ToList(); return (rows, rows.Count); }
         public override List<Invoice> GetByVehicleId(int id, int tenant) { s.Read("vehicle-invoices", id, tenant); return s.Invoices.Where(x => x.ServiceId == id && x.TenantId == tenant).ToList(); }
         public override (int TotalCount, int PendingCount, decimal PendingTotal) GetStats(int tenant) { var rows = GetAll(tenant); return (rows.Count, rows.Count, rows.Sum(x => x.Total)); }
         public override List<InvoiceDetail> GetDetails(int id, int tenant) => GetById(id, tenant)?.Details ?? new();

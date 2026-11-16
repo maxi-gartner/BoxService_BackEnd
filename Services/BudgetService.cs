@@ -21,8 +21,8 @@ public class BudgetService
     public List<Budget> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
     public (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
-        int tenantId, int page, int pageSize, string? status) =>
-        _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status);
+        int tenantId, int page, int pageSize, string? status, string? search = null) =>
+        _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status, search);
 
     // Sin paginar a propósito: un vehículo puntual nunca acumula miles de
     // presupuestos propios — lo usa BudgetsList (Taller) en vez de pedir

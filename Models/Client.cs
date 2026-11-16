@@ -26,6 +26,13 @@ namespace BoxService_BackEnd.Models
         public string? Email { get; set; }
     }
 
+    public class ClientUpdateRequest
+    {
+        public string? Name { get; set; }
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+    }
+
     public class ClientVehicle
     {
         public int Id { get; set; }

@@ -557,6 +557,14 @@ app.MapPost("/clients", (ClientCreateRequest request, HttpContext context, Clien
     }
 }).RequireAuthorization();
 
+app.MapPatch("/clients/{id:int}", (int id, ClientUpdateRequest request, HttpContext context, ClientService service) =>
+{
+    var result = service.Update(id, context.TenantId(), request);
+    return result.ok
+        ? Results.Ok(ApiEnvelope<object>.Ok(new { message = "Client updated" }))
+        : Results.Json(ApiEnvelope<object>.Fail(result.notFound ? 404 : 400, result.error), statusCode: result.notFound ? 404 : 400);
+}).RequireAuthorization();
+
 app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();
 app.MapServiceEndpoints();

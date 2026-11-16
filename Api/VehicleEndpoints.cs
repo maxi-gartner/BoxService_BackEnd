@@ -112,6 +112,45 @@ public static class VehicleEndpoints
                 return Error(404, ex.Message);
             }
         });
+
+        app.MapPatch("/vehicles/{id:int}", (int id, VehicleUpdateRequest request, HttpContext context, VehicleService service) =>
+        {
+            try
+            {
+                var vehicle = service.Update(context.TenantId(), id, request);
+                return Results.Ok(ApiEnvelope<object>.Ok(VehicleDto.FromModel(vehicle)));
+            }
+            catch (ArgumentException ex)
+            {
+                return Error(400, ex.Message);
+            }
+            catch (VehiclePlateConflictException ex)
+            {
+                return Results.Json(new ApiEnvelope<object>
+                {
+                    Success = false,
+                    Data = new
+                    {
+                        existingVehicleId = ex.ExistingVehicleId,
+                        existingClientId = ex.ExistingClientId,
+                        existingClientName = ex.ExistingClientName
+                    },
+                    Error = new ApiError(409, ex.Message)
+                }, statusCode: 409);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Error(400, ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return Error(404, ex.Message);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Error(400, "A vehicle with that plate already exists.");
+            }
+        });
     }
 
     private static IResult Error(int code, string message) =>

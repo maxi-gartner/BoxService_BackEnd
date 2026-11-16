@@ -32,11 +32,13 @@ namespace BoxService_BackEnd.Repositories
         }
 
         // status: "pendientes" (draft/sent) o null/"todos" (sin filtro).
+        // search: ILIKE sobre patente/marca/modelo/nombre del cliente (join
+        // contra clientes), mismo criterio que VehicleRepository.GetPaged.
         // Trae marca/modelo/patente del vehículo embebidos (join) para que
         // la página de Presupuestos no tenga que pedir /vehicles aparte
         // solo para mostrar la etiqueta de cada fila.
         public virtual (List<(Budget Budget, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
-            int tenantId, int page, int pageSize, string? status)
+            int tenantId, int page, int pageSize, string? status, string? search = null)
         {
             var result = new List<(Budget, string, string, string)>();
             var totalCount = 0;
@@ -50,11 +52,19 @@ namespace BoxService_BackEnd.Repositories
                        COUNT(*) OVER() AS total_count
                 FROM presupuestos p
                 JOIN vehiculos v ON v.id_vehiculo = p.id_vehiculo AND v.tenant_id = p.tenant_id
+                LEFT JOIN clientes c ON c.id_cliente = v.id_cliente AND c.tenant_id = v.tenant_id
                 WHERE p.tenant_id = @tenant_id {statusFilter}
+                  AND (@search::text IS NULL
+                       OR v.patente ILIKE '%' || @search::text || '%'
+                       OR v.marca ILIKE '%' || @search::text || '%'
+                       OR v.modelo ILIKE '%' || @search::text || '%'
+                       OR p.numero ILIKE '%' || @search::text || '%'
+                       OR c.nombre ILIKE '%' || @search::text || '%')
                 ORDER BY p.created_at DESC
                 LIMIT @page_size OFFSET @offset;", conn);
 
             cmd.Parameters.AddWithValue("tenant_id", tenantId);
+            cmd.Parameters.AddWithValue("search", string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim());
             cmd.Parameters.AddWithValue("page_size", pageSize);
             cmd.Parameters.AddWithValue("offset", (page - 1) * pageSize);
 

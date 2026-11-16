@@ -144,6 +144,30 @@ namespace BoxService_BackEnd.Repositories
             return MapClient(reader);
         }
 
+        public virtual bool Update(int id, int tenantId, ClientUpdateRequest request)
+        {
+            var current = GetById(id, tenantId);
+            if (current is null) return false;
+
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                UPDATE clientes
+                SET nombre = @nombre, telefono = @telefono, email = @email
+                WHERE id_cliente = @id AND tenant_id = @tenant_id;", conn);
+
+            var name = string.IsNullOrWhiteSpace(request.Name) ? current.Name : request.Name.Trim();
+            var phone = request.Phone is null ? current.Phone : request.Phone.Trim();
+            var email = request.Email is null ? current.Email : request.Email.Trim();
+
+            cmd.Parameters.AddWithValue("nombre", name);
+            cmd.Parameters.AddWithValue("telefono", string.IsNullOrWhiteSpace(phone) ? DBNull.Value : phone);
+            cmd.Parameters.AddWithValue("email", string.IsNullOrWhiteSpace(email) ? DBNull.Value : email);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
         public virtual List<ClientVehicle> GetVehiclesByClientId(int clientId, int tenantId)
         {
             var result = new List<ClientVehicle>();

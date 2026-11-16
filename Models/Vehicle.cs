@@ -38,4 +38,14 @@ namespace BoxService_BackEnd.Models
     {
         public int NewClientId { get; set; }
     }
+
+    public class VehicleUpdateRequest
+    {
+        public string? Brand { get; set; }
+        public string? Model { get; set; }
+        public string? Version { get; set; }
+        public int? Year { get; set; }
+        public string? Plate { get; set; }
+        public int? CurrentMileage { get; set; }
+    }
 }

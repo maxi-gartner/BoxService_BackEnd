@@ -8,6 +8,27 @@ namespace BoxService_BackEnd.Repositories
 {
     public class VehicleRepository
     {
+        public virtual bool Update(int id, int tenantId, Vehicle updated)
+        {
+            using var conn = DatabaseConnection.GetConnection();
+            using var cmd = new NpgsqlCommand(@"
+                UPDATE vehiculos
+                SET marca = @marca, modelo = @modelo, version = @version,
+                    anio = @anio, patente = @patente, kilometraje_actual = @kilometraje_actual
+                WHERE id_vehiculo = @id AND tenant_id = @tenant_id;", conn);
+
+            cmd.Parameters.AddWithValue("marca", updated.Brand);
+            cmd.Parameters.AddWithValue("modelo", updated.Model);
+            cmd.Parameters.AddWithValue("version", string.IsNullOrWhiteSpace(updated.Version) ? DBNull.Value : updated.Version);
+            cmd.Parameters.AddWithValue("anio", updated.Year.HasValue ? (object)updated.Year.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("patente", updated.Plate);
+            cmd.Parameters.AddWithValue("kilometraje_actual", updated.CurrentMileage);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("tenant_id", tenantId);
+
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
         public virtual List<Vehicle> GetAll(int tenantId)
         {
             var result = new List<Vehicle>();

@@ -25,8 +25,8 @@ namespace BoxService_BackEnd.Services
         public List<Invoice> GetAll(int tenantId) => _repo.GetAll(tenantId);
 
         public (List<(Invoice Invoice, int VehicleId, string Plate, string Brand, string Model)> Items, int TotalCount) GetPaged(
-            int tenantId, int page, int pageSize, string? status) =>
-            _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status);
+            int tenantId, int page, int pageSize, string? status, string? search = null) =>
+            _repo.GetPaged(tenantId, Math.Max(1, page), Math.Clamp(pageSize, 1, 100), status, search);
 
         public List<Invoice> GetByVehicleId(int vehicleId, int tenantId) => _repo.GetByVehicleId(vehicleId, tenantId);
 

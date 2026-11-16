@@ -9,7 +9,7 @@ public static class InvoiceEndpoints
 {
     public static void MapInvoiceEndpoints(this WebApplication app)
     {
-        app.MapGet("/invoices", (int? vehicleId, int? page, int? pageSize, string? status, HttpContext context, InvoiceService service, VehicleService vehicles) =>
+        app.MapGet("/invoices", (int? vehicleId, int? page, int? pageSize, string? status, string? search, HttpContext context, InvoiceService service, VehicleService vehicles) =>
         {
             var tenantId = context.TenantId();
 
@@ -19,7 +19,7 @@ public static class InvoiceEndpoints
                 return Ok(service.GetByVehicleId(vid, tenantId).Select(InvoiceDto.FromModel).ToArray());
             }
 
-            var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status);
+            var (items, total) = service.GetPaged(tenantId, page ?? 1, pageSize ?? 25, status, search);
             return Ok(new PagedResult<InvoiceDto>
             {
                 Items = items.Select(i => InvoiceDto.FromModel(i.Invoice, i.VehicleId, i.Plate, i.Brand, i.Model)).ToList(),

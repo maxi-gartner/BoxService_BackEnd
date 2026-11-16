@@ -10,4 +10,5 @@ public interface IClientRepository
     List<(Client Client, string TenantName)> GetAllAdmin();
     List<ClientVehicle> GetVehiclesByClientId(int clientId, int tenantId);
     Client Create(int tenantId, ClientCreateRequest request);
+    bool Update(int id, int tenantId, ClientUpdateRequest request);
 }

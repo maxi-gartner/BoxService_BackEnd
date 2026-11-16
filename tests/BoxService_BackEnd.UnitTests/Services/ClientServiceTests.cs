@@ -216,6 +216,7 @@ public class ClientServiceTests
         public Func<int, int, List<ClientVehicle>> OnGetVehicles { get; set; } = (_, _) => throw new InvalidOperationException("Unexpected GetVehicles");
         public Func<int, List<Client>> OnGetAll { get; set; } = _ => throw new InvalidOperationException("Unexpected GetAll");
         public Func<List<(Client Client, string TenantName)>> OnGetAllAdmin { get; set; } = () => throw new InvalidOperationException("Unexpected GetAllAdmin");
+        public Func<int, int, ClientUpdateRequest, bool> OnUpdate { get; set; } = (_, _, _) => throw new InvalidOperationException("Unexpected Update");
 
         public Client Create(int tenantId, ClientCreateRequest request)
         {
@@ -251,6 +252,12 @@ public class ClientServiceTests
         {
             Calls.Add(nameof(GetAllAdmin));
             return OnGetAllAdmin();
+        }
+
+        public bool Update(int id, int tenantId, ClientUpdateRequest request)
+        {
+            Calls.Add(nameof(Update));
+            return OnUpdate(id, tenantId, request);
         }
     }
 }
