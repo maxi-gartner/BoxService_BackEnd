@@ -59,6 +59,16 @@ por servicio (`ConnectionStrings__DefaultConnection`), nada de código.
 | `Email__FromAddress`, `Email__FromName` | `Email:FromAddress`, `Email:FromName` | remitente verificado del email |
 | `Email__EnableSsl` | `Email:EnableSsl` | `true` para SMTP con TLS |
 | `PasswordReset__FrontendUrl` | `PasswordReset:FrontendUrl` | página del frontend que consume el token de recuperación |
+| `SUPABASE_URL` | (no tiene equivalente en `appsettings.json`, se lee directo de la env var) | Project URL de Supabase — Settings → API. **La misma en dev y en prod** (un solo proyecto) |
+| `SUPABASE_KEY` | ídem | **service_role key**, no la `anon` — el backend sube fotos de inspección y crea URLs firmadas del lado del servidor |
+| `SUPABASE_BUCKET` | ídem | opcional, default `vehicle-inspections` si no se define |
+
+Sin `SUPABASE_URL`/`SUPABASE_KEY`, cualquier operación con fotos de
+inspección (subir, ver, borrar) falla con 503 — el backend lo loguea
+como `InspectionPhotoStorageUnavailable`, pero el frontend muestra el
+503 como "no pudimos conectar con el servidor" (mismo texto que un
+fallo de red real), así que si pasa esto revisá primero estas tres env
+vars antes de sospechar de Vercel/Render.
 
 `Jwt__Issuer`, `Jwt__Audience` y `Jwt__ExpiresMinutes` ya vienen con un
 valor por defecto en `render.yaml` — no hace falta tocarlos salvo que
