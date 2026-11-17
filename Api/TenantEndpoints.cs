@@ -37,7 +37,7 @@ public static class TenantEndpoints
 
         app.MapPatch("/tenants/{id:int}", (int id, TenantUpdateRequest request, TenantService service) => Write(() =>
         {
-            if (request.Active is null && request.Telefono is null && request.Email is null)
+            if (request.Name is null && request.Active is null && request.Telefono is null && request.Email is null)
                 return Error(400, "Nothing to update.");
             var updated = service.Update(id, request);
             return updated ? Ok(new { message = "Tenant updated" }) : Error(404, "Tenant not found");

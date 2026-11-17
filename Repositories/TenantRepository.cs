@@ -144,11 +144,13 @@ namespace BoxService_BackEnd.Repositories
             using var conn = DatabaseConnection.GetConnection();
             using var cmd = new NpgsqlCommand(@"
                 UPDATE tenants
-                SET activo = COALESCE(@activo, activo),
+                SET nombre = COALESCE(@nombre, nombre),
+                    activo = COALESCE(@activo, activo),
                     telefono = COALESCE(@telefono, telefono),
                     email = COALESCE(@email, email)
                 WHERE id_tenant = @id;", conn);
 
+            cmd.Parameters.AddWithValue("nombre", (object?)request.Name?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("activo", (object?)request.Active ?? DBNull.Value);
             cmd.Parameters.AddWithValue("telefono", (object?)request.Telefono?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("email", (object?)request.Email?.Trim() ?? DBNull.Value);

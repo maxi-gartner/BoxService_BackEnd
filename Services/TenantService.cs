@@ -52,6 +52,12 @@ namespace BoxService_BackEnd.Services
                 string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim());
         }
 
-        public bool Update(int id, TenantUpdateRequest request) => _tenants.Update(id, request);
+        public bool Update(int id, TenantUpdateRequest request)
+        {
+            if (request.Name is not null && string.IsNullOrWhiteSpace(request.Name))
+                throw new ArgumentException("El nombre del taller no puede estar vacío.");
+
+            return _tenants.Update(id, request);
+        }
     }
 }
