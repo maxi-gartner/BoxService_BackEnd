@@ -55,7 +55,11 @@ public static class PortalEndpoints
                         total = details.Sum(d => d.Subtotal),
                     };
                 }),
-                services = servicesService.GetByVehicleId(vehicle.VehicleId, client.TenantId).Select(ServiceDto.FromModel),
+                services = servicesService.GetByVehicleId(vehicle.VehicleId, client.TenantId).Select(service => new
+                {
+                    service = ServiceDto.FromModel(service),
+                    details = servicesService.GetDetails(service.ServiceId),
+                }),
             });
 
             return Ok(new
@@ -64,5 +68,28 @@ public static class PortalEndpoints
                 vehicles,
             });
         });
+
+        // Rol customer: "¿cómo va mi auto?" — queda pendiente hasta que
+        // alguien del taller la marca como atendida desde Recordatorios.
+        // Limitada a 1 por vehículo por hora (ver VehicleStatusInquiryRepository)
+        // para que no se pueda hacer spam a fuerza de clicks.
+        app.MapPost("/portal/vehicles/{id:int}/status-inquiry", (
+            int id,
+            HttpContext context,
+            ClientRepository clientRepository,
+            VehicleStatusInquiryService inquiryService) => Write(() =>
+        {
+            var clientIdClaim = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            if (!int.TryParse(clientIdClaim, out var clientId))
+                return Error(401, "Token inválido.");
+
+            var client = clientRepository.GetById(clientId);
+            if (client is null) return Error(404, "Cliente no encontrado.");
+
+            var (_, rateLimited, notFound, result) = inquiryService.Create(client.TenantId, id, clientId);
+            if (notFound) return Error(404, "Vehículo no encontrado.");
+            if (rateLimited) return Error(429, "Ya consultamos el estado de este vehículo hace menos de una hora. Probá de nuevo más tarde.");
+            return Ok(new { inquiryId = result!.InquiryId }, 201);
+        }));
     }
 }

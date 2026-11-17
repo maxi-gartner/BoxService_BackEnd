@@ -206,6 +206,8 @@ builder.Services.AddScoped<ServicesService>();
 builder.Services.AddScoped<ITenantServiceAccess, TenantServiceAccess>();
 builder.Services.AddScoped<ServiceReminderRepository>();
 builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<VehicleStatusInquiryRepository>();
+builder.Services.AddScoped<VehicleStatusInquiryService>();
 
 // ── Portal del cliente (login con Google, ver estado del vehículo) ───
 builder.Services.AddScoped<PortalAccessRepository>();

@@ -26,6 +26,7 @@ internal sealed class TenantIsolationStore
     public List<Invoice> Invoices { get; } = new();
     public List<ServiceInspection> Inspections { get; } = new();
     public List<ServiceInspectionPhoto> Photos { get; } = new();
+    public List<VehicleStatusInquiry> StatusInquiries { get; } = new();
     public List<string> Writes { get; } = new();
     public List<(string Resource, int Id, int Tenant)> ScopedReads { get; } = new();
     public List<int> PortalClientReads { get; } = new();
@@ -116,6 +117,33 @@ internal sealed class TenantIsolationStore
         public override long GetNextNumber() => 999;
         public override int CreateWithTransaction(Invoice value) { s.Writes.Add("invoice-create"); value.InvoiceId = 999; s.Invoices.Add(value); return 999; }
         public override bool UpdateStatus(int id, int tenant, string status) { s.Writes.Add("invoice-status"); s.Invoices.Single(x => x.InvoiceId == id).Status = status; return true; }
+    }
+
+    public sealed class StatusInquiriesRepo(TenantIsolationStore s) : VehicleStatusInquiryRepository
+    {
+        public override VehicleStatusInquiry? Create(int tenant, int vehicle, int client)
+        {
+            if (s.StatusInquiries.Any(x => x.VehicleId == vehicle && x.TenantId == tenant && x.CreatedAt > DateTime.UtcNow.AddHours(-1)))
+                return null;
+            s.Writes.Add("status-inquiry-create");
+            var item = new VehicleStatusInquiry { InquiryId = s.StatusInquiries.Count + 1, TenantId = tenant, VehicleId = vehicle, ClientId = client, CreatedAt = DateTime.UtcNow };
+            s.StatusInquiries.Add(item);
+            return item;
+        }
+
+        public override List<VehicleStatusInquiryRow> ListPending(int tenant) =>
+            s.StatusInquiries.Where(x => x.TenantId == tenant && x.ResolvedAt is null)
+                .Select(x => new VehicleStatusInquiryRow(x.InquiryId, x.VehicleId, x.ClientId, "Name", "Vehicle", "Plate", x.CreatedAt))
+                .ToList();
+
+        public override bool Resolve(int tenant, int id)
+        {
+            var item = s.StatusInquiries.SingleOrDefault(x => x.InquiryId == id && x.TenantId == tenant && x.ResolvedAt is null);
+            if (item is null) return false;
+            s.Writes.Add("status-inquiry-resolve");
+            item.ResolvedAt = DateTime.UtcNow;
+            return true;
+        }
     }
 
     public sealed class InspectionsRepo(TenantIsolationStore s) : ServiceInspectionRepository(null!)

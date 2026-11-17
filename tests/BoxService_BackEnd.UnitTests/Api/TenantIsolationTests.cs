@@ -187,11 +187,31 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
         var row = Assert.Single(data.GetProperty("vehicles").EnumerateArray());
         Assert.Equal(subject, row.GetProperty("vehicle").GetProperty("vehicleId").GetInt32());
         Assert.Equal(subject, Assert.Single(row.GetProperty("budgets").EnumerateArray()).GetProperty("budget").GetProperty("budgetId").GetInt32());
-        Assert.Equal(subject, Assert.Single(row.GetProperty("services").EnumerateArray()).GetProperty("serviceId").GetInt32());
+        Assert.Equal(subject, Assert.Single(row.GetProperty("services").EnumerateArray()).GetProperty("service").GetProperty("serviceId").GetInt32());
         Assert.Equal(subject, Assert.Single(state.PortalClientReads));
         Assert.All(state.ScopedReads, read => { Assert.Equal(subject / 100, read.Tenant); Assert.Equal(subject, read.Id); });
         Assert.Equal(before, state.Snapshot());
         Assert.Empty(state.Writes);
+    }
+
+    [Fact]
+    public async Task StatusInquiry_RateLimitsPerVehicle_AndRejectsOtherTenantsVehicle()
+    {
+        var state = new TenantIsolationStore();
+        using var host = Host(state);
+        using var owner = Client(host, "customer", 1, 101);
+
+        using var first = await Send(owner, "POST", "/portal/vehicles/101/status-inquiry", null);
+        Assert.Equal(201, (int)first.StatusCode);
+        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
+
+        using var second = await Send(owner, "POST", "/portal/vehicles/101/status-inquiry", null);
+        Assert.Equal(429, (int)second.StatusCode);
+        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
+
+        using var foreign = await Send(owner, "POST", "/portal/vehicles/201/status-inquiry", null);
+        Assert.Equal(404, (int)foreign.StatusCode);
+        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
     }
 
     [Theory]
@@ -237,7 +257,7 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
         Assert.Equal(200, (int)newResponse.StatusCode);
         using var newJson = JsonDocument.Parse(await newResponse.Content.ReadAsStringAsync());
         var transferred = newJson.RootElement.GetProperty("data").GetProperty("vehicles").EnumerateArray().Single(v => v.GetProperty("vehicle").GetProperty("vehicleId").GetInt32() == 101);
-        Assert.Equal(101, Assert.Single(transferred.GetProperty("services").EnumerateArray()).GetProperty("serviceId").GetInt32());
+        Assert.Equal(101, Assert.Single(transferred.GetProperty("services").EnumerateArray()).GetProperty("service").GetProperty("serviceId").GetInt32());
     }
 
     private WebApplicationFactory<AuthService> Host(TenantIsolationStore state) => factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
@@ -248,6 +268,7 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
         services.AddSingleton<ServicesRepository>(new TenantIsolationStore.ServicesRepo(state));
         services.AddSingleton<InvoiceRepository>(new TenantIsolationStore.InvoicesRepo(state));
         services.AddSingleton<ServiceInspectionRepository>(new TenantIsolationStore.InspectionsRepo(state));
+        services.AddSingleton<VehicleStatusInquiryRepository>(new TenantIsolationStore.StatusInquiriesRepo(state));
         services.AddSingleton<SucursalRepository>(new TenantIsolationStore.BranchesRepo());
         services.AddSingleton<SupabaseStorageService>(new TenantIsolationStore.Storage(state));
         services.AddSingleton<AuthAuditRepository>(new TenantIsolationStore.AuditRepo(state));
