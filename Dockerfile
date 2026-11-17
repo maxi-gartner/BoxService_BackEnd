@@ -17,9 +17,11 @@ WORKDIR /app
 # La imagen base viene recortada al mínimo y no trae libgssapi_krb5 — lo
 # pide la pila de TLS de Npgsql/Google.Apis.Auth al conectar a Supabase o
 # validar tokens de Google, y sin esto el proceso ni arranca
-# ("libgssapi_krb5.so.2: cannot open shared object file").
+# ("libgssapi_krb5.so.2: cannot open shared object file"). OJO: el paquete
+# es libgssapi-krb5-2, NO libkrb5-3 — ese solo trae libkrb5.so.3, nunca
+# provee libgssapi_krb5.so.2 (son paquetes Debian/Ubuntu distintos).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libkrb5-3 \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
