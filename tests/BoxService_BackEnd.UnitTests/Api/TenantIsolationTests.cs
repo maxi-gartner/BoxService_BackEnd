@@ -214,6 +214,47 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
         Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
     }
 
+    [Fact]
+    public async Task WorkOrder_EnforcesOneOpenPerVehicle_StrictTransitions_AndTenantIsolation()
+    {
+        var state = new TenantIsolationStore();
+        using var host = Host(state);
+        using var owner = Client(host, "dueno", 1, 1001);
+
+        using var receive = await Send(owner, "POST", "/vehicles/101/work-orders", "{}");
+        Assert.Equal(201, (int)receive.StatusCode);
+        using var receiveJson = JsonDocument.Parse(await receive.Content.ReadAsStringAsync());
+        var orderId = receiveJson.RootElement.GetProperty("data").GetProperty("orderId").GetInt32();
+
+        using var receiveAgain = await Send(owner, "POST", "/vehicles/101/work-orders", "{}");
+        Assert.Equal(409, (int)receiveAgain.StatusCode);
+
+        using var foreignVehicle = await Send(owner, "POST", "/vehicles/201/work-orders", "{}");
+        Assert.Equal(404, (int)foreignVehicle.StatusCode);
+
+        using var skip = await Send(owner, "PATCH", $"/work-orders/{orderId}/status", "{\"status\":\"terminado\"}");
+        Assert.Equal(409, (int)skip.StatusCode);
+
+        using var advance = await Send(owner, "PATCH", $"/work-orders/{orderId}/status", "{\"status\":\"en_proceso\"}");
+        Assert.Equal(200, (int)advance.StatusCode);
+
+        using var cancelAfterStarted = await Send(owner, "DELETE", $"/work-orders/{orderId}", null);
+        Assert.Equal(409, (int)cancelAfterStarted.StatusCode);
+
+        using var otherTenant = Client(host, "dueno", 2, 2001);
+        using var crossTenantAdvance = await Send(otherTenant, "PATCH", $"/work-orders/{orderId}/status", "{\"status\":\"terminado\"}");
+        Assert.Equal(404, (int)crossTenantAdvance.StatusCode);
+
+        using var finish = await Send(owner, "PATCH", $"/work-orders/{orderId}/status", "{\"status\":\"terminado\"}");
+        Assert.Equal(200, (int)finish.StatusCode);
+        using var deliver = await Send(owner, "PATCH", $"/work-orders/{orderId}/status", "{\"status\":\"entregado\"}");
+        Assert.Equal(200, (int)deliver.StatusCode);
+
+        // Entregada: el vehículo vuelve a poder recibirse (ya no queda abierta).
+        using var receiveAgainAfterDelivery = await Send(owner, "POST", "/vehicles/101/work-orders", "{}");
+        Assert.Equal(201, (int)receiveAgainAfterDelivery.StatusCode);
+    }
+
     [Theory]
     [InlineData("GET", "/clients/201", null)]
     [InlineData("GET", "/vehicles/201", null)]
@@ -269,6 +310,7 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
         services.AddSingleton<InvoiceRepository>(new TenantIsolationStore.InvoicesRepo(state));
         services.AddSingleton<ServiceInspectionRepository>(new TenantIsolationStore.InspectionsRepo(state));
         services.AddSingleton<VehicleStatusInquiryRepository>(new TenantIsolationStore.StatusInquiriesRepo(state));
+        services.AddSingleton<WorkOrderRepository>(new TenantIsolationStore.WorkOrdersRepo(state));
         services.AddSingleton<SucursalRepository>(new TenantIsolationStore.BranchesRepo());
         services.AddSingleton<SupabaseStorageService>(new TenantIsolationStore.Storage(state));
         services.AddSingleton<AuthAuditRepository>(new TenantIsolationStore.AuditRepo(state));

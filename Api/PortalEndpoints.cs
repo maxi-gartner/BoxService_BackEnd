@@ -31,7 +31,8 @@ public static class PortalEndpoints
             ClientRepository clientRepository,
             VehicleRepository vehicleRepository,
             BudgetRepository budgetRepository,
-            ServicesService servicesService) =>
+            ServicesService servicesService,
+            WorkOrderService workOrderService) =>
         {
             var clientIdClaim = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             if (!int.TryParse(clientIdClaim, out var clientId))
@@ -60,6 +61,7 @@ public static class PortalEndpoints
                     service = ServiceDto.FromModel(service),
                     details = servicesService.GetDetails(service.ServiceId),
                 }),
+                workOrder = ToWorkOrderDto(workOrderService.GetLatestForVehicle(vehicle.VehicleId, client.TenantId)),
             });
 
             return Ok(new
@@ -92,4 +94,7 @@ public static class PortalEndpoints
             return Ok(new { inquiryId = result!.InquiryId }, 201);
         }));
     }
+
+    private static object? ToWorkOrderDto(Models.WorkOrder? order) =>
+        order is null ? null : new { status = order.Status, deliveredAt = order.DeliveredAt };
 }

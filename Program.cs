@@ -208,6 +208,8 @@ builder.Services.AddScoped<ServiceReminderRepository>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<VehicleStatusInquiryRepository>();
 builder.Services.AddScoped<VehicleStatusInquiryService>();
+builder.Services.AddScoped<WorkOrderRepository>();
+builder.Services.AddScoped<WorkOrderService>();
 
 // ── Portal del cliente (login con Google, ver estado del vehículo) ───
 builder.Services.AddScoped<PortalAccessRepository>();
@@ -571,6 +573,7 @@ app.MapVehicleEndpoints();
 app.MapBudgetEndpoints();
 app.MapServiceEndpoints();
 app.MapServiceReminderEndpoints();
+app.MapWorkOrderEndpoints();
 app.MapServiceInspectionEndpoints();
 app.MapInvoiceEndpoints();
 app.MapCatalogEndpoints();

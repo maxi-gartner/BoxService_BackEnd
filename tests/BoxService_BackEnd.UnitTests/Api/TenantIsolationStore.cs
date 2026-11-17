@@ -27,6 +27,7 @@ internal sealed class TenantIsolationStore
     public List<ServiceInspection> Inspections { get; } = new();
     public List<ServiceInspectionPhoto> Photos { get; } = new();
     public List<VehicleStatusInquiry> StatusInquiries { get; } = new();
+    public List<WorkOrder> WorkOrders { get; } = new();
     public List<string> Writes { get; } = new();
     public List<(string Resource, int Id, int Tenant)> ScopedReads { get; } = new();
     public List<int> PortalClientReads { get; } = new();
@@ -142,6 +143,52 @@ internal sealed class TenantIsolationStore
             if (item is null) return false;
             s.Writes.Add("status-inquiry-resolve");
             item.ResolvedAt = DateTime.UtcNow;
+            return true;
+        }
+    }
+
+    public sealed class WorkOrdersRepo(TenantIsolationStore s) : WorkOrderRepository
+    {
+        private int _nextId = 1;
+
+        public override WorkOrder? Create(int tenant, int vehicle, string? notes, string receivedBy)
+        {
+            if (s.WorkOrders.Any(x => x.VehicleId == vehicle && x.TenantId == tenant && x.Status != "entregado"))
+                return null;
+            s.Writes.Add("work-order-create");
+            var item = new WorkOrder { OrderId = _nextId++, TenantId = tenant, VehicleId = vehicle, Notes = notes, ReceivedBy = receivedBy, Status = "en_espera", CreatedAt = DateTime.UtcNow };
+            s.WorkOrders.Add(item);
+            return item;
+        }
+
+        public override WorkOrder? GetById(int id, int tenant) =>
+            s.WorkOrders.SingleOrDefault(x => x.OrderId == id && x.TenantId == tenant);
+
+        public override WorkOrder? GetLatestForVehicle(int vehicle, int tenant) =>
+            s.WorkOrders.Where(x => x.VehicleId == vehicle && x.TenantId == tenant).OrderByDescending(x => x.CreatedAt).FirstOrDefault();
+
+        public override List<WorkOrderRow> ListOpen(int tenant) =>
+            s.WorkOrders.Where(x => x.TenantId == tenant && x.Status != "entregado")
+                .Select(x => new WorkOrderRow(x.OrderId, x.VehicleId, x.Status, x.Notes, "Name", "Vehicle", "Plate", x.CreatedAt))
+                .ToList();
+
+        public override bool UpdateStatus(int id, int tenant, string currentStatus, string newStatus, string? notes, string? deliveredBy)
+        {
+            var item = s.WorkOrders.SingleOrDefault(x => x.OrderId == id && x.TenantId == tenant && x.Status == currentStatus);
+            if (item is null) return false;
+            s.Writes.Add("work-order-status");
+            item.Status = newStatus;
+            if (notes is not null) item.Notes = notes;
+            if (deliveredBy is not null) item.DeliveredBy = deliveredBy;
+            return true;
+        }
+
+        public override bool Cancel(int id, int tenant)
+        {
+            var item = s.WorkOrders.SingleOrDefault(x => x.OrderId == id && x.TenantId == tenant && x.Status == "en_espera");
+            if (item is null) return false;
+            s.Writes.Add("work-order-cancel");
+            s.WorkOrders.Remove(item);
             return true;
         }
     }
