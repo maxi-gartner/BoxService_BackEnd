@@ -195,23 +195,33 @@ public sealed class TenantIsolationTests(SecurityRegressionFactory factory)
     }
 
     [Fact]
-    public async Task StatusInquiry_RateLimitsPerVehicle_AndRejectsOtherTenantsVehicle()
+    public async Task StatusInquiry_RequiresAnOpenWorkOrder_ThenRateLimitsPerVehicle_AndRejectsOtherTenantsVehicle()
     {
         var state = new TenantIsolationStore();
         using var host = Host(state);
+        using var staff = Client(host, "dueno", 1, 1001);
         using var owner = Client(host, "customer", 1, 101);
+
+        // Todavía no se recibió el vehículo — no tiene sentido preguntar
+        // "¿cómo va?" de un auto que ni siquiera está en el taller.
+        using var tooSoon = await Send(owner, "POST", "/portal/vehicles/101/status-inquiry", null);
+        Assert.Equal(409, (int)tooSoon.StatusCode);
+        Assert.Empty(state.Writes);
+
+        using var receive = await Send(staff, "POST", "/vehicles/101/work-orders", "{}");
+        Assert.Equal(201, (int)receive.StatusCode);
 
         using var first = await Send(owner, "POST", "/portal/vehicles/101/status-inquiry", null);
         Assert.Equal(201, (int)first.StatusCode);
-        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
+        Assert.Single(state.Writes, w => w == "status-inquiry-create");
 
         using var second = await Send(owner, "POST", "/portal/vehicles/101/status-inquiry", null);
         Assert.Equal(429, (int)second.StatusCode);
-        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
+        Assert.Single(state.Writes, w => w == "status-inquiry-create");
 
         using var foreign = await Send(owner, "POST", "/portal/vehicles/201/status-inquiry", null);
         Assert.Equal(404, (int)foreign.StatusCode);
-        Assert.Equal("status-inquiry-create", Assert.Single(state.Writes));
+        Assert.Single(state.Writes, w => w == "status-inquiry-create");
     }
 
     [Fact]

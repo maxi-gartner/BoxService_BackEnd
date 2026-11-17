@@ -88,8 +88,9 @@ public static class PortalEndpoints
             var client = clientRepository.GetById(clientId);
             if (client is null) return Error(404, "Cliente no encontrado.");
 
-            var (_, rateLimited, notFound, result) = inquiryService.Create(client.TenantId, id, clientId);
+            var (_, rateLimited, notFound, notReceived, result) = inquiryService.Create(client.TenantId, id, clientId);
             if (notFound) return Error(404, "Vehículo no encontrado.");
+            if (notReceived) return Error(409, "Este vehículo todavía no fue recibido en el taller.");
             if (rateLimited) return Error(429, "Ya consultamos el estado de este vehículo hace menos de una hora. Probá de nuevo más tarde.");
             return Ok(new { inquiryId = result!.InquiryId }, 201);
         }));

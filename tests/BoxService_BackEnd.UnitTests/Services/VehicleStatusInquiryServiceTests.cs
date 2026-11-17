@@ -11,21 +11,26 @@ public class VehicleStatusInquiryServiceTests
 {
     private readonly FakeVehicleStatusInquiryRepository _repository = new();
     private readonly FakeVehicleRepository _vehicles = new();
+    private readonly FakeWorkOrderRepository _workOrders = new();
     private readonly VehicleStatusInquiryService _service;
 
-    public VehicleStatusInquiryServiceTests() => _service = new VehicleStatusInquiryService(_repository, _vehicles);
+    public VehicleStatusInquiryServiceTests() => _service = new VehicleStatusInquiryService(_repository, _vehicles, _workOrders);
+
+    private void VehicleExists() => _vehicles.OnGetById = (_, _) => new Vehicle { VehicleId = 41, ClientId = 31, TenantId = 1 };
 
     [Fact]
-    public void Create_WhenVehicleDoesNotExist_ReturnsNotFound_AndNeverHitsTheInquiryRepository()
+    public void Create_WhenVehicleDoesNotExist_ReturnsNotFound_AndNeverChecksTheWorkOrderOrInquiryRepository()
     {
         _vehicles.OnGetById = (_, _) => null;
 
-        var (ok, rateLimited, notFound, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
 
         Assert.False(ok);
         Assert.False(rateLimited);
         Assert.True(notFound);
+        Assert.False(notReceived);
         Assert.Null(result);
+        Assert.False(_workOrders.Called);
         Assert.Empty(_repository.Calls);
     }
 
@@ -34,13 +39,64 @@ public class VehicleStatusInquiryServiceTests
     {
         _vehicles.OnGetById = (_, _) => new Vehicle { VehicleId = 41, ClientId = 999, TenantId = 1 };
 
-        var (ok, rateLimited, notFound, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
 
         Assert.False(ok);
         Assert.False(rateLimited);
         Assert.True(notFound);
+        Assert.False(notReceived);
         Assert.Null(result);
         Assert.Empty(_repository.Calls);
+    }
+
+    [Fact]
+    public void Create_WhenNeverReceived_ReturnsNotReceived_AndNeverHitsTheInquiryRepository()
+    {
+        VehicleExists();
+        _workOrders.OnGetLatestForVehicle = (_, _) => null;
+
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+
+        Assert.False(ok);
+        Assert.False(rateLimited);
+        Assert.False(notFound);
+        Assert.True(notReceived);
+        Assert.Null(result);
+        Assert.Empty(_repository.Calls);
+    }
+
+    [Fact]
+    public void Create_WhenAlreadyDelivered_ReturnsNotReceived_AndNeverHitsTheInquiryRepository()
+    {
+        VehicleExists();
+        _workOrders.OnGetLatestForVehicle = (_, _) => new WorkOrder { OrderId = 9, Status = "entregado" };
+
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+
+        Assert.False(ok);
+        Assert.False(rateLimited);
+        Assert.False(notFound);
+        Assert.True(notReceived);
+        Assert.Null(result);
+        Assert.Empty(_repository.Calls);
+    }
+
+    [Theory]
+    [InlineData("en_espera")]
+    [InlineData("en_proceso")]
+    [InlineData("terminado")]
+    public void Create_WhenCurrentlyReceived_ChecksTheInquiryRepository(string status)
+    {
+        VehicleExists();
+        _workOrders.OnGetLatestForVehicle = (_, _) => new WorkOrder { OrderId = 9, Status = status };
+        _repository.OnCreate = (_, _, _) => null; // solo nos importa que haya llegado hasta acá
+
+        var (_, rateLimited, notFound, notReceived, _) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+
+        Assert.True(rateLimited);
+        Assert.False(notFound);
+        Assert.False(notReceived);
+        Assert.Single(_repository.Calls);
     }
 
     [Fact]
@@ -49,21 +105,24 @@ public class VehicleStatusInquiryServiceTests
         // El repo devuelve null cuando el INSERT...WHERE NOT EXISTS no
         // inserta nada — ya hubo una consulta de este vehículo hace
         // menos de una hora.
-        _vehicles.OnGetById = (_, _) => new Vehicle { VehicleId = 41, ClientId = 31, TenantId = 1 };
+        VehicleExists();
+        _workOrders.OnGetLatestForVehicle = (_, _) => new WorkOrder { OrderId = 9, Status = "en_espera" };
         _repository.OnCreate = (_, _, _) => null;
 
-        var (ok, rateLimited, notFound, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
 
         Assert.False(ok);
         Assert.True(rateLimited);
         Assert.False(notFound);
+        Assert.False(notReceived);
         Assert.Null(result);
     }
 
     [Fact]
     public void Create_WhenValid_ReturnsOkWithTheCreatedInquiry()
     {
-        _vehicles.OnGetById = (_, _) => new Vehicle { VehicleId = 41, ClientId = 31, TenantId = 1 };
+        VehicleExists();
+        _workOrders.OnGetLatestForVehicle = (_, _) => new WorkOrder { OrderId = 9, Status = "en_proceso" };
         var expected = new VehicleStatusInquiry { InquiryId = 7, TenantId = 1, VehicleId = 41, ClientId = 31 };
         _repository.OnCreate = (tenantId, vehicleId, clientId) =>
         {
@@ -73,11 +132,12 @@ public class VehicleStatusInquiryServiceTests
             return expected;
         };
 
-        var (ok, rateLimited, notFound, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
+        var (ok, rateLimited, notFound, notReceived, result) = _service.Create(tenantId: 1, vehicleId: 41, clientId: 31);
 
         Assert.True(ok);
         Assert.False(rateLimited);
         Assert.False(notFound);
+        Assert.False(notReceived);
         Assert.Same(expected, result);
     }
 
@@ -136,5 +196,18 @@ public class VehicleStatusInquiryServiceTests
             (_, _) => throw new InvalidOperationException("Unexpected GetById");
 
         public override Vehicle? GetById(int id, int tenantId) => OnGetById(id, tenantId);
+    }
+
+    private sealed class FakeWorkOrderRepository : WorkOrderRepository
+    {
+        public bool Called { get; private set; }
+        public Func<int, int, WorkOrder?> OnGetLatestForVehicle { get; set; } =
+            (_, _) => throw new InvalidOperationException("Unexpected GetLatestForVehicle");
+
+        public override WorkOrder? GetLatestForVehicle(int vehicleId, int tenantId)
+        {
+            Called = true;
+            return OnGetLatestForVehicle(vehicleId, tenantId);
+        }
     }
 }
